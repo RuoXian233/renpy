@@ -324,7 +324,13 @@ python early hide:
         if loop is None:
             loop = config.default_sound_loop
 
-        renpy.sound.queue(_audio_eval(p["file"]), channel=channel, loop=loop, relative_volume=eval(p.get("volume", "1.0")))
+        renpy.sound.queue(
+            _audio_eval(p["file"]),
+            channel=channel,
+            fadein=eval(p.get("fadein", "0")),
+            loop=loop,
+            relative_volume=eval(p.get("volume", "1.0"))
+            )
 
 
     renpy.register_statement('queue sound',
@@ -468,13 +474,48 @@ python early hide:
     # Should we predict screens?
     config.predict_screen_statements = True
 
+    def _get_screen_name(p):
+        """
+        Returns screen name from the parsed data, evals it
+        if it's an expression
+        """
+        name = p["name"]
+        if p.get("expression", False):
+            return eval(name)
+
+        return name
+
+    def _parse_screen_name(l):
+        """
+        Parses screen name from the lexer, returns tuple of 2 items
+
+        OUT:
+            tuple:
+                (name, is_expression)
+        """
+        # Check if this screen name is an expression
+        if l.keyword("expression"):
+            is_expression = True
+            name = l.require(l.simple_expression)
+
+        # Otherwise just parse a name
+        else:
+            is_expression = False
+            name = l.require(l.name)
+
+        return (name, is_expression)
+
     def warp_true(p):
         return True
 
     def parse_show_call_screen(l):
+        # Parse a name
+        name, expression = _parse_screen_name(l)
 
-        # Parse a name.
-        name = l.require(l.name)
+        # Add pass between name and arguments if the name is an expression
+        # so it works akin to "call expression 'label_name' pass (count=1)"
+        if expression:
+            l.keyword('pass')
 
         # Parse the list of arguments.
         arguments = renpy.parser.parse_arguments(l)
@@ -495,10 +536,11 @@ python early hide:
 
         l.expect_eol()
 
-        return dict(name=name, arguments=arguments, predict=predict, transition_expr=transition_expr)
+        return dict(name=name, arguments=arguments, predict=predict, transition_expr=transition_expr, expression=expression)
 
     def parse_hide_screen(l):
-        name = l.require(l.name)
+        # Parse a name
+        name, expression = _parse_screen_name(l)
 
         transition_expr = None
 
@@ -507,7 +549,7 @@ python early hide:
 
         l.expect_eol()
 
-        return dict(name=name, transition_expr=transition_expr)
+        return dict(name=name, transition_expr=transition_expr, expression=expression)
 
     def predict_screen(p):
 
@@ -519,7 +561,11 @@ python early hide:
         if not predict:
             return
 
-        name = p["name"]
+        try:
+            name = _get_screen_name(p)
+        except Exception:
+            return
+
         a = p["arguments"]
 
         if a is not None:
@@ -532,7 +578,7 @@ python early hide:
 
     def execute_show_screen(p):
 
-        name = p["name"]
+        name = _get_screen_name(p)
         a = p["arguments"]
 
         if a is not None:
@@ -552,7 +598,7 @@ python early hide:
 
     def execute_call_screen(p):
 
-        name = p["name"]
+        name = _get_screen_name(p)
         a = p["arguments"]
 
         transition_expr = p.get("transition_expr", None)
@@ -569,7 +615,7 @@ python early hide:
         store._return = renpy.call_screen(name, *args, **kwargs)
 
     def execute_hide_screen(p):
-        name = p["name"]
+        name = _get_screen_name(p)
 
         transition_expr = p.get("transition_expr", None)
         if transition_expr is not None:
@@ -582,6 +628,10 @@ python early hide:
 
 
     def lint_screen(p):
+        # Don't lint if it's an expression
+        if p.get("expression", False):
+            return
+
         name = p["name"]
         if not renpy.has_screen(name):
             renpy.error("Screen %s does not exist." % name)

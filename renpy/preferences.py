@@ -22,9 +22,9 @@
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # *
 
-
-
 import copy
+import math
+
 import renpy
 
 pad_bindings = {
@@ -173,6 +173,9 @@ Preference("high_contrast", False)
 # Should sound continue playing when the window is minimized?
 Preference("audio_when_minimized", True)
 
+# Should a progressive web app preload all files into the browser cache?
+Preference("pwa_preload", False)
+
 class Preferences(renpy.object.Object):
     """
     Stores preferences that will one day be persisted.
@@ -220,6 +223,7 @@ class Preferences(renpy.object.Object):
         system_cursor = False
         high_contrast = False
         audio_when_minimized = True
+        pwa_preload = False
 
     def init(self):
         """
@@ -260,7 +264,7 @@ class Preferences(renpy.object.Object):
         self.init()
 
     def set_volume(self, mixer, volume):
-        if volume != 0:
+        if not renpy.config.preserve_volume_when_muted and volume != 0:
             self.mute[mixer] = False
 
         self.volumes[mixer] = volume
@@ -269,16 +273,36 @@ class Preferences(renpy.object.Object):
         if mixer not in self.volumes:
             return 0.0
 
-        if self.mute.get(mixer, False):
+        if not renpy.config.preserve_volume_when_muted and self.mute.get(mixer, False):
             return 0.0
 
         return self.volumes[mixer]
 
+
+    def set_mixer(self, mixer, volume):
+        if volume > 0:
+            volume = renpy.config.volume_db_range * volume - renpy.config.volume_db_range
+            volume = 10 ** (volume / 20)
+
+        self.set_volume(mixer, volume)
+
+    def get_mixer(self, mixer):
+        rv = self.get_volume(mixer)
+
+        if rv == 0:
+            return 0
+
+        rv = 20 * math.log10(rv)
+        rv = (rv + renpy.config.volume_db_range) / renpy.config.volume_db_range
+
+        return rv
+
     def set_mute(self, mixer, mute):
         self.mute[mixer] = mute
 
-        if (not mute) and (self.volumes.get(mixer, 1.0) == 0.0):
-            self.volumes[mixer] = 1.0
+        if not renpy.config.preserve_volume_when_muted:
+            if (not mute) and (self.volumes.get(mixer, 1.0) == 0.0):
+                self.volumes[mixer] = 1.0
 
     def get_mute(self, mixer):
         if mixer not in self.volumes:
@@ -287,7 +311,7 @@ class Preferences(renpy.object.Object):
         return self.mute[mixer]
 
     def init_mixers(self):
-        for i in renpy.audio.music.get_all_mixers():
+        for i in renpy.audio.music.get_all_mixers() + ["main"]:
             self.volumes.setdefault(i, 1.0)
             self.mute.setdefault(i, False)
 

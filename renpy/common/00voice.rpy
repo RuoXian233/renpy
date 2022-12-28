@@ -181,9 +181,13 @@ init -1500 python:
             persistent._character_volume[voice_tag] = 1.0
 
         if volume is None:
-            return DictValue(persistent._character_volume, voice_tag, 1.0)
+            return _CharacterVolumeValue(voice_tag)
         else:
-            return SetDict(persistent._character_volume, voice_tag, volume)
+            if config.quadratic_volume:
+                return SetDict(persistent._character_volume, voice_tag, volume ** 2)
+            else:
+                return SetDict(persistent._character_volume, voice_tag, volume)
+
 
     def GetCharacterVolume(voice_tag):
         """
@@ -443,8 +447,6 @@ init -1500 python hide:
             _voice.play = vi.filename
         else:
             _voice.play = None
-
-        renpy.game.context().deferred_translate_identifier = None
 
         _voice.auto_file = vi.auto_filename
         _voice.sustain = vi.sustain

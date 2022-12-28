@@ -304,7 +304,6 @@ def show_display_say(who, what, who_args={}, what_args={}, window_args={},
             layer = renpy.config.say_layer
 
         tag = screen
-        index = 0
 
         if multiple:
 
@@ -414,9 +413,9 @@ class SlowDone(object):
         for c in self.callback:
             c("slow_done", interact=self.interact, type=self.type, **self.cb_args)
 
-# This function takes care of repeatably showing the screen as part of
-# an interaction.
-
+# This is a queue for text that's going to be passed to the say behavior to
+# set the AFM info.
+afm_text_queue = [ ]
 
 def display_say(
         who,
@@ -440,12 +439,20 @@ def display_say(
         multiple=None,
         dtt=None):
 
+    global afm_text_queue
+
     # Final is true if this statement should perform an interaction.
 
     if multiple is None:
         final = interact
+
+        afm_text_queue = [ ]
+
     else:
         step, total = multiple
+
+        if step == 1:
+            afm_text_queue = [ ]
 
         if step == total:
             final = interact
@@ -602,10 +609,15 @@ def display_say(
             else:
                 what_text = show_function(who, what_string)
 
-            if interact or what_string or (what_ctc is not None) or (behavior and afm):
+            if isinstance(what_text, tuple):
+                what_text = renpy.display.screen.get_widget(what_text[0], what_text[1], what_text[2])
 
-                if isinstance(what_text, tuple):
-                    what_text = renpy.display.screen.get_widget(what_text[0], what_text[1], what_text[2])
+            if not multiple:
+                afm_text_queue = [ what_text ]
+            else:
+                afm_text_queue.append(what_text)
+
+            if interact or what_string or (what_ctc is not None) or (behavior and afm):
 
                 if not isinstance(what_text, renpy.text.text.Text): # @UndefinedVariable
                     raise Exception("The say screen (or show_function) must return a Text object.")
@@ -637,7 +649,7 @@ def display_say(
                     raise Exception("The displayable with id 'what' was not given the exact contents of the what variable given to the say screen.")
 
                 if behavior and afm:
-                    behavior.set_text(what_text)
+                    behavior.set_text(*afm_text_queue)
 
             else:
 
@@ -672,11 +684,10 @@ def display_say(
     if final:
 
         if not dtt.no_wait:
-            if checkpoint:
-                if exception is None:
-                    renpy.exports.checkpoint(True)
-                else:
-                    renpy.exports.checkpoint(exception)
+            if exception is None:
+                renpy.exports.checkpoint(True, hard=checkpoint)
+            else:
+                renpy.exports.checkpoint(exception)
 
         else:
             renpy.game.after_rollback = after_rollback
@@ -760,7 +771,7 @@ class ADVCharacter(object):
             self,
             name=NotSet,
             kind=None,
-            **properties):
+            **properties): # type: (str|None|renpy.object.Sentinel, None|str|ADVCharacter, Any) -> None
 
         if kind is None:
             kind = renpy.store.adv
@@ -874,32 +885,81 @@ class ADVCharacter(object):
         return
 
     # This is what shows the screen for a given interaction.
-    def do_show(self, who, what, multiple=None):
+
+    def get_show_properties(self, extra_properties):
+        """
+        This merges a potentially empty dict of extra properties in with
+        show_function.
+        """
+
+        screen = self.screen
+        show_args = self.show_args
+        who_args = self.who_args
+        what_args = self.what_args
+        window_args = self.window_args
+        properties = self.properties
+
+        if extra_properties:
+
+            screen = extra_properties.pop("screen", screen)
+
+            show_args = show_args.copy()
+            who_args = who_args.copy()
+            what_args = what_args.copy()
+            window_args = window_args.copy()
+
+            properties = collections.defaultdict(dict)
+
+            for k, v in self.properties.items():
+                properties[k] = v.copy()
+
+            prefixes = [ "show", "cb", "what", "window", "who"] + renpy.config.character_id_prefixes
+            split_args = [ i + "_" for i in prefixes ] + [ "" ]
+
+            split = renpy.easy.split_properties(extra_properties, *split_args)
+
+            for prefix, dictionary in zip(prefixes, split):
+                properties[prefix].update(dictionary)
+
+            properties["who"].update(split[-1])
+
+            show_args.update(properties.pop("show"))
+            who_args.update(properties.pop("who"))
+            what_args.update(properties.pop("what"))
+            window_args.update(properties.pop("window"))
+
+        return screen, show_args, who_args, what_args, window_args, properties
+
+
+    def do_show(self, who, what, multiple=None, extra_properties=None):
+
+        screen, show_args, who_args, what_args, window_args, properties = self.get_show_properties(extra_properties)
 
         if multiple is not None:
 
             return self.show_function(
                 who,
                 what,
-                who_args=self.who_args,
-                what_args=self.what_args,
-                window_args=self.window_args,
-                screen=self.screen,
-                properties=self.properties,
+                who_args=who_args,
+                what_args=what_args,
+                window_args=window_args,
+                screen=screen,
+                properties=properties,
                 multiple=multiple,
-                **self.show_args)
+                **show_args)
 
         else:
 
             return self.show_function(
                 who,
                 what,
-                who_args=self.who_args,
-                what_args=self.what_args,
-                window_args=self.window_args,
-                screen=self.screen,
-                properties=self.properties,
-                **self.show_args)
+                who_args=who_args,
+                what_args=what_args,
+                window_args=window_args,
+                screen=screen,
+                properties=properties,
+                **show_args)
+
 
     # This is called after the last interaction is done.
     def do_done(self, who, what, multiple=None):
@@ -919,16 +979,19 @@ class ADVCharacter(object):
 
     # This is called to predict images that will be used by this
     # statement.
-    def do_predict(self, who, what):
+    def do_predict(self, who, what, extra_properties=None):
+
+        screen, show_args, who_args, what_args, window_args, properties = self.get_show_properties(extra_properties)
+
         return self.predict_function(
             who,
             what,
-            who_args=self.who_args,
-            what_args=self.what_args,
-            window_args=self.window_args,
-            screen=self.screen,
-            properties=self.properties,
-            **self.show_args)
+            who_args=who_args,
+            what_args=what_args,
+            window_args=window_args,
+            screen=screen,
+            properties=properties,
+            **show_args)
 
     def resolve_say_attributes(self, predict, attrs):
         """
@@ -953,7 +1016,7 @@ class ADVCharacter(object):
         tagged_attrs = (self.image_tag,) + attrs
         images = renpy.game.context().images
 
-        layer = renpy.config.tag_layer.get(self.image_tag, "master")
+        layer = renpy.exports.default_layer(None, self.image_tag)
 
         # If image is showing already, resolve it, then show or predict it.
         if images.showing(layer, (self.image_tag,)):
@@ -1250,7 +1313,7 @@ class ADVCharacter(object):
 
             dtt = DialogueTextTags(what)
 
-            # Now, display the damned thing.
+            # Now, display the dialogue.
             self.do_display(who, what, cb_args=self.cb_args, dtt=dtt, **display_args)
 
             # Indicate that we're done.
@@ -1282,10 +1345,10 @@ class ADVCharacter(object):
                     self.handle_say_transition('restore', before, after) # type: ignore
 
     def statement_name(self):
-        if self._statement_name is not None:
-            return self._statement_name
-        elif not (self.condition is None or renpy.python.py_eval(self.condition)):
+        if not (self.condition is None or renpy.python.py_eval(self.condition)):
             return "say-condition-false"
+        elif self._statement_name is not None:
+            return self._statement_name
         else:
             return "say"
 
@@ -1491,7 +1554,7 @@ def Character(name=NotSet, kind=None, **properties):
     `callback`
         A function that is called when events occur while the
         character is speaking. See the section on
-        :ref:`character-callbacks` fore more information.
+        :ref:`character-callbacks` for more information.
 
     **Click-to-continue.**
     A click-to-continue indicator is displayed once all the text has

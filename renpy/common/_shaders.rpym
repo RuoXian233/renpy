@@ -68,7 +68,11 @@ init python:
             renpy_blur_norm += renpy_blur_weight;
         }
 
-        gl_FragColor /= renpy_blur_norm;
+        if (renpy_blur_norm > 0.0) {
+            gl_FragColor /= renpy_blur_norm;
+        } else {
+            gl_FragColor = texture2D(tex0, v_tex_coord.xy, 0.0);
+        }
    """)
 
     renpy.register_shader("renpy.solid", variables="""
@@ -140,10 +144,8 @@ init python:
     """)
 
 init python hide:
+    from operator import mul
 
-    def multiply(old, new):
-        return old * new
-
-    config.merge_uniforms["u_renpy_alpha"] = multiply
-    config.merge_uniforms["u_renpy_over"] = multiply
-    config.merge_uniforms["u_renpy_matrixcolor"] = multiply
+    config.merge_uniforms["u_renpy_alpha"] = mul
+    config.merge_uniforms["u_renpy_over"] = mul
+    config.merge_uniforms["u_renpy_matrixcolor"] = mul

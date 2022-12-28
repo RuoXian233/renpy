@@ -25,7 +25,7 @@
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # *
 
-
+import pygame_sdl2 as pygame
 
 import renpy
 from renpy.display.render import render, Render
@@ -166,12 +166,16 @@ class Container(renpy.display.core.Displayable):
         rv._duplicatable = False
 
         for i in rv.children:
-            i._unique()
-
             if i._duplicatable:
                 rv._duplicatable = True
 
         return rv
+
+    def _unique(self):
+        for i in self.children:
+            i._unique()
+
+        self._duplicatable = False
 
     def _in_current_store(self):
 
@@ -279,9 +283,7 @@ class Container(renpy.display.core.Displayable):
         return None
 
     def visit(self):
-        rv = list(self.children)
-        rv.reverse()
-        return rv
+        return list(self.children)
 
     # These interact with the ui functions to allow use as a context
     # manager.
@@ -547,16 +549,23 @@ class Grid(Container):
         super(Grid, self).per_interact()
 
         delta = (self.cols * self.rows) - len(self.children)
-        if delta > 0:
+
+        if not delta:
+            return
+
+        if renpy.config.developer:
             allow_underfull = self.allow_underfull
+
             if allow_underfull is None:
                 allow_underfull = renpy.config.allow_underfull_grids
 
             if not allow_underfull:
                 raise Exception("Grid not completely full.")
-            else:
-                for _ in range(delta):
-                    self.add(Null())
+
+        null = Null()
+
+        for _ in range(delta):
+            self.add(null)
 
 
 class IgnoreLayers(Exception):
@@ -564,8 +573,6 @@ class IgnoreLayers(Exception):
     Raise this to have the event ignored by layers, but reach the
     underlay. This can also be used to stop processing focuses.
     """
-
-    pass
 
 
 def default_modal_function(ev, x, y, w, h):
@@ -983,7 +990,10 @@ class MultiBox(Container):
             xfill = max(0, xfill)
             yfill = max(0, yfill)
 
-            line_count = len([i for i in line if not i[0]._box_skip])
+            if renpy.config.box_skip:
+                line_count = len([i for i in line if not i[0]._box_skip])
+            else:
+                line_count = len(line)
 
             if line_count > 0:
                 xperchild = xfill // line_count
@@ -1003,7 +1013,7 @@ class MultiBox(Container):
                 sw = max(line_width, sw)
                 sh = max(line_height, sh)
 
-                if not child._box_skip:
+                if (not child._box_skip) or (not renpy.config.box_skip):
 
                     x += i * xperchild
                     y += i * yperchild
@@ -1041,7 +1051,7 @@ class MultiBox(Container):
 
             for d, padding, cst, cat in zip(children, spacings, csts, cats):
 
-                if d._box_skip:
+                if d._box_skip and renpy.config.box_skip:
                     padding = 0
 
                 if box_wrap:
@@ -1086,7 +1096,7 @@ class MultiBox(Container):
 
             for d, padding, cst, cat in zip(children, spacings, csts, cats):
 
-                if d._box_skip:
+                if d._box_skip and renpy.config.box_skip:
                     padding = 0
 
                 if box_wrap:
@@ -1222,7 +1232,7 @@ class SizeGroup(renpy.object.Object):
         return maxwidth
 
 
-size_groups = dict()
+size_groups = {}
 
 
 class Window(Container):
@@ -1347,7 +1357,10 @@ class Window(Container):
                 height = min(height, ymaximum)
 
         rv = renpy.display.render.Render(width, height)
+
         rv.modal = self.style.modal
+        if rv.modal and not callable(rv.modal):
+            rv.modal = "window" # type: ignore
 
         # Draw the background. The background should render at exactly the
         # requested size. (That is, be a Frame or a Solid).
@@ -1390,8 +1403,9 @@ class Window(Container):
             return rv
 
         w, h = self.window_size
-        if check_modal(self.style.modal, ev, x, y, w, h):
-            raise IgnoreLayers()
+        if ev.type in ( pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION ):
+            if check_modal(self.style.modal, ev, x, y, w, h):
+                raise IgnoreLayers()
 
         return None
 
@@ -1406,7 +1420,9 @@ class DynamicDisplayable(renpy.display.core.Displayable):
     :doc: disp_dynamic
 
     A displayable that can change its child based on a Python
-    function, over the course of an interaction.
+    function, over the course of an interaction. It does not
+    take any properties, as its layout is controlled by the
+    properties of the child displayable it returns.
 
     `function`
         A function that is called with the arguments:
@@ -2139,12 +2155,22 @@ class Flatten(Container):
 
     Flatten is a relatively expensive operation, and so should only be used
     when absolutely required.
+
+    `drawable_resolution`
+        Defaults to true, which is usually the right choice, but may cause
+        the resulting texture, when scaled, to have different artifacts than
+        the textures that make it up. Setting this to False will change the
+        artifacts, which may be more pleasing in some cases.
     """
 
-    def __init__(self, child, **properties):
+    drawable_resolution = True
+
+    def __init__(self, child, drawable_resolution=True, **properties):
         super(Flatten, self).__init__(**properties)
 
         self.add(child)
+
+        self.drawable_resolution = drawable_resolution
 
     def render(self, width, height, st, at):
         cr = renpy.display.render.render(self.child, width, height, st, at)
@@ -2158,6 +2184,7 @@ class Flatten(Container):
         rv.mesh = True
         rv.add_shader("renpy.texture")
         rv.add_property("mipmap", renpy.config.mipmap_dissolves if (self.style.mipmap is None) else self.style.mipmap)
+        rv.add_property("drawable_resolution", self.drawable_resolution)
 
         self.offsets = [ (0, 0) ]
 
@@ -2192,6 +2219,9 @@ class AlphaMask(Container):
         self.add(child)
         self.null = None
 
+    def visit(self):
+        return [ self.mask, self.child ]
+
     def render(self, width, height, st, at):
 
         cr = renpy.display.render.render(self.child, width, height, st, at)
@@ -2225,3 +2255,147 @@ class AlphaMask(Container):
         self.offsets = [ (0, 0), (0, 0) ]
 
         return rv
+
+
+class NearRect(Container):
+    """
+    This lays a child above or below a supplied rectangle.
+
+    `rect`
+        The rectangle to place the child near.
+
+    `prefer_top`
+        If true, the child is placed above the rectangle, if there is
+        room.
+    """
+
+    def __init__(self, child=None, rect=None, focus=None, prefer_top=False, replaces=None, **properties):
+
+        super(NearRect, self).__init__(**properties)
+
+        if focus is not None:
+            rect = renpy.display.focus.get_focus_rect(focus)
+
+        if (focus is None) and (rect is None):
+            raise Exception("A NearRect requires either a focus or a rect parameter.")
+
+        self.parent_rect = rect
+        self.focus_rect = focus
+        self.prefer_top = prefer_top
+
+        if replaces is not None:
+            self.hide_parent_rect = replaces.hide_parent_rect
+        else:
+            self.hide_parent_rect = None
+
+        if child is not None:
+            self.add(child)
+
+    def per_interact(self):
+
+        if self.focus_rect is None:
+            return
+
+        rect = renpy.display.focus.get_focus_rect(self.focus_rect)
+
+        if (rect is not None) and (self.parent_rect is None):
+            self.child.set_transform_event("show")
+        elif (rect is None) and (self.parent_rect is not None):
+            self.child.set_transform_event("hide")
+            self.hide_parent_rect = self.parent_rect
+
+        if self.parent_rect != rect:
+            self.parent_rect = rect
+            renpy.display.render.redraw(self, 0)
+
+
+    def render(self, width, height, st, at):
+
+        rv = renpy.display.render.Render(width, height)
+
+        rect = self.parent_rect or self.hide_parent_rect
+
+        if rect is None:
+            self.offsets = [ (0, 0) ] # type: ignore
+            return rv
+
+        px, py, pw, ph = rect
+
+        # Determine the available area.
+        avail_w = width
+        avail_h = max(py, height - py - ph)
+
+        # Render thje child, and get its size.
+        cr = renpy.display.render.render(self.child, avail_w, avail_h, st, at)
+        cw, ch = cr.get_size()
+
+        if isinstance(self.child, renpy.display.motion.Transform):
+            if self.child.hide_response:
+                self.hide_parent_rect = None
+        else:
+            self.hide_parent_rect = None
+
+        # The child might have hidden itself, so avoid showing the child if
+        # it hasn't changed.
+        rect = self.parent_rect or self.hide_parent_rect
+
+        if rect is None:
+            self.offsets = [ (0, 0) ] # type: ignore
+            return rv
+
+        # Work out the placement.
+        xpos, _ypos, xanchor, _yanchor, xoffset, yoffset, _subpixel = self.child.get_placement()
+
+        if xpos is None:
+            xpos = 0
+        if xanchor is None:
+            xanchor = 0
+        if xoffset is None:
+            xoffset = 0
+        if yoffset is None:
+            yoffset = 0
+
+        # Y positioning.
+        if self.prefer_top and (ch < py):
+            layout_y = py - ch
+        elif ch <= (height - py - ph):
+            layout_y = py + ph
+        else:
+            layout_y = py - ch
+
+        # Initial x positioning - using a variant of the layout algorithm.
+        if isinstance(xpos, float):
+            xpos = xpos * pw
+
+        if isinstance(xanchor, float):
+            xanchor = xanchor * cw
+
+        layout_x = px + xpos - xanchor
+
+        # Final x positioning - make sure the child fits inside the screen.
+        if layout_x + cw > width:
+            layout_x = width - cw
+
+        if layout_x < 0:
+            layout_x = 0
+
+        # Apply offsets.
+        layout_x += xoffset
+        layout_y += yoffset
+
+        rv.blit(cr, (layout_x, layout_y))
+        self.offsets = [ (layout_x, layout_y) ]
+
+        return rv
+
+    def event(self, ev, x, y, st):
+        if self.parent_rect is not None:
+            return super(NearRect, self).event(ev, x, y, st)
+        else:
+            return None
+
+    def _tts(self):
+        if self.parent_rect is not None:
+            return self._tts_common()
+        else:
+            return ""

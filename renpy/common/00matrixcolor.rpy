@@ -47,14 +47,6 @@ init -1500 python:
         def __mul__(self, other):
             return _MultiplyMatrix(self, other)
 
-        def __eq__(self, other):
-            if type(self) != type(other):
-                return False
-
-            return self.__dict__ == other.__dict__
-
-        def __ne__(self, other):
-            return not (self == other)
 
     class ColorMatrix(_BaseMatrix):
         """
@@ -66,7 +58,7 @@ init -1500 python:
 
         pass
 
-    class _MultiplyMatrix(ColorMatrix):
+    class _MultiplyMatrix(ColorMatrix, DictEquality):
         """
         :undocumented:
 
@@ -85,16 +77,13 @@ init -1500 python:
             return self.left(other.left, done) * self.right(other.right, done)
 
 
-    class IdentityMatrix(ColorMatrix):
+    class IdentityMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
         :args: ()
 
         A ColorMatrix that can be used with :tpref:`matrixcolor` that does not
         change the color or alpha of what is supplied to it.
-
-        `value`
-            Is ignored.
         """
 
         def get(self, value):
@@ -104,7 +93,7 @@ init -1500 python:
                             0.0, 0.0, 0.0, 1.0, ])
 
 
-    class SaturationMatrix(ColorMatrix):
+    class SaturationMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -141,7 +130,7 @@ init -1500 python:
                             I(r, 0), I(g, 0), I(b, 1), 0,
                             0, 0, 0, 1 ])
 
-    class TintMatrix(ColorMatrix):
+    class TintMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -190,7 +179,7 @@ init -1500 python:
                             0, 0, b, 0,
                             0, 0, 0, a ])
 
-    class BrightnessMatrix(ColorMatrix):
+    class BrightnessMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -211,7 +200,7 @@ init -1500 python:
                             0, 0, 1, value,
                             0, 0, 0, 1 ])
 
-    class OpacityMatrix(ColorMatrix):
+    class OpacityMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -232,7 +221,7 @@ init -1500 python:
 
 
 
-    class ContrastMatrix(ColorMatrix):
+    class ContrastMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -255,7 +244,7 @@ init -1500 python:
                             0, 0, 0, 1, ])
 
 
-    class ColorizeMatrix(ColorMatrix):
+    class ColorizeMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -305,7 +294,7 @@ init -1500 python:
                             0, 0, 0, 1, ])
 
 
-    class HueMatrix(ColorMatrix):
+    class HueMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 
@@ -334,7 +323,7 @@ init -1500 python:
                 0, 0, 0, 1.0 ])
 
 
-    class InvertMatrix(ColorMatrix):
+    class InvertMatrix(ColorMatrix, DictEquality):
         """
         :doc: colormatrix
 

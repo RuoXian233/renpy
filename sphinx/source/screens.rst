@@ -111,6 +111,7 @@ in a block may be one of two things:
 * A property list.
 * A screen language statement.
 
+.. _screen-statement:
 
 Screen Statement
 ----------------
@@ -157,15 +158,15 @@ expression. It takes the following properties:
 
 `roll_forward`
     If true, roll forward will be enabled when the screen is used in a
-    ``call screen`` statement. If false, roll forward is disable, and
-    if None, the value of :var:`config.call_screen_roll_forward` is
-    used.
+    ``call screen`` statement. If false, roll forward is disabled, and
+    if None or not given, the value of :var:`config.call_screen_roll_forward`
+    is used.
 
     When roll forwarding from a ``call screen`` statement, return values
     and terminal jumps are preserved, but other side effects will not
-    occur. This means that if the screen consists entirely of :func:`Jump`
+    occur. This means that if the screen only contains :func:`Jump`
     and :func:`Return` actions, it's safe to enable `roll_forward`. Other
-    actions may have side-effects that will not occur duting the `roll_forward`.
+    actions may have side-effects that will not occur during the roll_forward.
 
 ::
 
@@ -187,7 +188,7 @@ parentheses, the difference in behavior are described in the section
 concerning :ref:`the use statement <sl-use>`. If no other screen
 ``use`` a given screen, not giving parentheses to that screen leads to
 pure inefficiency in the way Ren'py works internally, see the
-:ref:`screen optimization section <screen-optimization>` concerning
+:doc:`screen optimization section <screen_optimization>` concerning
 parameters.
 
 
@@ -231,6 +232,9 @@ All user interface statements take the following common properties:
     If given and true, the displayable is focused by default. When
     multiple displayables have this, the values are compared and the
     displayable with the greatest default focus becomes the default.
+
+    The default focus is only used when the last interaction was not
+    a mouse click, mouse movement, or touch.
 
 `id`
     An identifier for the user-interface statement. When a screen is
@@ -404,11 +408,11 @@ action. A button takes no parameters, and the following properties.
     If not provided, the action will be used to determine sensitivity.
 
 `keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the action of this button.
 
 `alternate_keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the alternate action of this button.
 
 It also takes:
@@ -421,6 +425,66 @@ It also takes:
 It takes one children. If zero, two, or more children are supplied,
 they are implicitly added to a fixed, which is added to the button.
 
+
+.. _sl-dismiss:
+
+Dismiss
+-------
+
+The dismiss statement creates the highly specialized dismiss displayable,
+which gains focus when no other displayable has focus,
+and runs an action when it's activated. In this regard, it works
+very similarly to the behavior of the say statement.
+
+This is rarely used, and mostly to allow a modal frame to be
+dismissed when the player clicks outside it, as might be the case
+with a popup window.
+
+This takes the following properties:
+
+`action`
+    The action performed when the dismiss is activated. This property is
+    required.
+
+`keysym`
+    A string giving a :doc:`keysym <keymap>` describing a key that,
+    when pressed, invokes the action of this dismiss. This replaces the default
+    "dismiss" keysym.
+
+`modal`
+    By default, the dimiss is modal, preventing events from being processed
+    by displayables "behind" it.
+
+
+It also takes:
+
+* :ref:`Common Properties <common-properties>`
+* The :propref:`hover_sound` and :propref:`activate_sound` style properties.
+
+Here's an example of dismiss being used::
+
+    screen dismiss_test():
+
+        dismiss action Return()
+
+        frame:
+            modal True
+
+            align (.5, .3)
+            padding (20, 20)
+
+            has vbox
+
+            text "This is a very important message.":
+                xalign 0.5
+                text_align 0.5
+
+            # Dismiss can be confusing on its own, so we'll add a button as well.
+            textbutton "Dismiss":
+                xalign 0.5
+                action Return()
+
+See also how dismiss is used in conjuction with :ref:`nearrect <sl-nearrect>`.
 
 .. _sl-fixed:
 
@@ -497,8 +561,10 @@ This displays its children in a grid. Each child is given an area of
 the same size, the size of the largest child.
 
 It takes two parameters. The first is the number of columns in the
-grid, and the second is the number of rows in the grid. It takes the
-following property:
+grid, and the second is the number of rows in the grid. If the grid
+is not full, the remaining cells are filled with the ``null`` displayable.
+
+Grid takes one property:
 
 `transpose`
     If False (the default), rows are filled before columns. If True,
@@ -615,11 +681,11 @@ properties:
     If not provided, the action will be used to determine sensitivity.
 
 `keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the action of this button.
 
 `alternate_keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the alternate action of this button.
 
 It also takes:
@@ -650,6 +716,9 @@ Creates a text input area, which allows the user to enter text. When
 the user presses return, the text will be returned by the
 interaction. (When the screen is invoked through ``call screen``, the result
 will be placed in the ``_return`` variable.)
+
+Due to limitations in supporting libraries, on Android and the web platform
+the input displayable is limited to alphabetic characters.
 
 The input statement takes no parameters, and the following properties:
 
@@ -730,8 +799,8 @@ or one of the keys in a given list. Key is used in a loose sense here,
 as it also allows joystick and mouse events.
 
 Key takes one positional parameter, a string giving the key to
-bind. See the :ref:`keymap` section for a description of available
-keysyms. It takes one property:
+bind. See the :doc:`keymap` section for a description of available
+keysyms. It takes two properties:
 
 `action`
     This gives an action that is run when the key is pressed. This
@@ -851,6 +920,115 @@ take up the entire screen, a less useful behavior.
 
     label start:
         show screen button_overlay
+
+.. _sl-nearrect:
+
+Nearrect
+--------
+
+The ``nearrect`` statement takes a single child, and lays that child out
+at a location near a rectangle. Usually, this is a rectangle focus captured using
+the :func:`CaptureFocus` action. This can be used for tooltips and dropdown or
+pulldown menus.
+
+Nearrect takes the following properties:
+
+`rect`
+    If given, this should be an (x, y, w, h) rectangle that the child is
+    positioned relative to, as described below.
+
+`focus`
+    If given, this should be a string. This string is passed to the equivalent of
+    :func:`GetFocusRect` to find the rectangle. If a focus rectangle with that
+    name is found, the child is rendered.
+
+    Passing "tooltip" to this uses the location of the last displayable that
+    was focused while displaying a tooltip.
+
+`prefer_top`
+    If given, positioning the child above the focus rect is preferred.
+
+It also takes:
+
+* :ref:`Common Properties <common-properties>`
+* :ref:`position-style-properties`
+
+
+Nearrect differs from the other layouts in that it positions its child near
+the given rectangle, rather than inside it. The child is first rendered with
+the full width available, and the maximum of the height above and height below
+the rectangle. The y position is then computed as followed.
+
+* If the child will fit above the rectangle and `prefer_top` is given, the child
+  is positioned directly above the rectangle.
+* Otherwise, if the child can fit below the rectangle, it's positioned directly
+  below the rectangle.
+* Otherwise, the child is positioned directly above the rectangle.
+
+The x positioning is computed using the normal rules, using the :propref:`xpos`
+and :propref:`xanchor` properties of the child, and properties that set them,
+such as :propref:`xalign`. The pos properties are relative to the x coordinate
+of the rectangle, and in the case of a floating point number, the width.
+
+At the end of positioning, the :propref:`xoffset` and :propref:`yoffset`
+properties are applied as normal.
+
+If the child of the nearrect is a transform, the transform is given ``show``
+and ``hide`` events. However, the position will change instantly. Nearrect
+works best on the top of a screen, with transforms and positioning applied
+to its child, rather the nearrect.
+
+One use of nearrect is for dropdown menus::
+
+    default difficulty = "Easy"
+
+    screen select_difficulty():
+
+        # This frame can be a very complex layout, if required.
+        frame:
+            align (.5, .3)
+            padding (20, 20)
+
+            has vbox
+
+            # This is the button that is clicked to enable the dropdown,
+            textbutton "Difficulty: [difficulty]":
+
+                # This action captures the focus rectangle, and in doing so,
+                # displays the dropdown.
+                action CaptureFocus("diff_drop")
+
+            textbutton "Done":
+                action Return()
+
+        # All sorts of other screen elements could be here, but the nearrect needs
+        # be at the top level, and the last thing show, apart from its child.
+
+        # Only if the focus has been captured, display the dropdown.
+        # You could also use showif instead of basic if
+        if GetFocusRect("diff_drop"):
+
+            # If the player clicks outside the frame, dismiss the dropdown.
+            # The ClearFocus action dismisses this dropdown.
+            dismiss action ClearFocus("diff_drop")
+
+            # This positions the displayable near (usually under) the button above.
+            nearrect:
+                focus "diff_drop"
+
+                # Finally, this frame contains the choices in the dropdown, with
+                # each using ClearFocus to dismiss the dropdown.
+                frame:
+                    modal True
+
+                    has vbox
+
+                    textbutton "Easy" action [ SetVariable("difficulty", "Easy"), ClearFocus("diff_drop") ]
+                    textbutton "Medium" action [ SetVariable("difficulty", "Medium"), ClearFocus("diff_drop") ]
+                    textbutton "Hard" action [ SetVariable("difficulty", "Hard"), ClearFocus("diff_drop") ]
+                    textbutton "Nightmare" action [ SetVariable("difficulty", "Nightmare"), ClearFocus("diff_drop") ]
+
+Dropdowns may benefit from improved styling, which isn't done here.
 
 
 .. _sl-null:
@@ -986,11 +1164,11 @@ following properties:
     If not provided, the action will be used to determine sensitivity.
 
 `keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the action of this button.
 
 `alternate_keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the alternate action of this button.
 
 `text_style`
@@ -1035,7 +1213,13 @@ takes the properties:
 `repeat`
     If True, the timer repeats after it times out.
 
-It takes no children.
+`modal`
+    If True, the timer will not fire if it is blocked by a modal
+    screen. If false or not given, the timer will fire even if it
+    is blocked by a modal screen.
+
+
+Timer takes no children.
 
 ::
 
@@ -1117,6 +1301,7 @@ following properties:
     `ysize`) tuple. This can usually be omitted, when the child can
     compute it's own size. If either component is None, the child's
     size is used.
+
 `mousewheel`
     This should be one of:
 
@@ -1135,8 +1320,12 @@ following properties:
         bottom.)
     "horizontal-change"
         Combines horizontal scrolling with change mode.
+
 `draggable`
-    If True, dragging the mouse will scroll the viewport.
+    If True, dragging the mouse will scroll the viewport. This can also be
+    a :ref:`variant <screen-variants>`, in which case the viewport will be draggable
+    if the variant is in place. (For example, ``draggable "touch"``.)
+
 `edgescroll`
     Controlls scrolling when the mouse reaches the edge of the
     viewport. If not None, this should be a two- or three-element
@@ -1184,7 +1373,7 @@ following properties:
     viewport. If `scrollbars` is "both", both horizontal and vertical
     scrollbars are created.
 
-    When `scrollbars` is not None, the `vpgrid` takes prefixed properties:
+    When `scrollbars` is not None, the `viewport` takes prefixed properties:
 
     * Properties beginning with ``viewport_`` are passed to the viewport.
     * Properties beginning with ``side_`` are passed to the side.
@@ -1249,8 +1438,8 @@ incorrectly, please ensure that all children are of the same size.
 
 A vpgrid must be given at least one of the `cols` and `rows` properties.
 If one is omitted or None, the other is automatically determined from the
-size, spacing, and number of children. If there are not enough children to
-fill all cells, any empty cells will not be rendered.
+size, spacing, and number of children. If a row or column would be underfull,
+``null`` displayable are used to fill the remaining space.
 
 Vpgrids take the the following properties:
 
@@ -1461,11 +1650,11 @@ also takes the following properties:
     If not provided, the action will be used to determine sensitivity.
 
 `keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the action of this button.
 
 `alternate_keysym`
-    A string giving a :ref:`keysym <keymap>` describing a keyboard key that,
+    A string giving a :doc:`keysym <keymap>` describing a keyboard key that,
     when pressed, invokes the alternate action of this button.
 
 It also takes:
@@ -1644,7 +1833,8 @@ For
 ---
 
 The ``for`` statement is similar to the Python ``for`` statement, except that
-it does not support the ``else`` clause. It supports assignment to
+it does not support the ``else`` clause nor the ``continue`` and ``break``
+statements. It supports assignment to
 (optionally nested) tuple patterns, as well as variables.
 
 ::
@@ -1958,6 +2148,18 @@ screen name, and an optional Python argument list. If present, the arguments
 are used to initialize the scope of the screen. There are also some
 specific keywords passed to :func:`show_screen` and :func:`call_screen`.
 
+If the ``expression`` keyword is given, the expression following it will be evaluated
+as the screen name. To pass arguments to the screen with the expression keyword,
+separate the expression and arguments with the ``pass`` keyword.
+
+::
+
+    $ screen_name = "my_screen"
+    show screen expression screen_name
+    # Or if you need to pass some arguments
+    show screen expression screen_name pass ("Foo", message="Bar")
+
+
 The show screen statement takes an optional ``nopredict`` keyword, that
 prevents screen prediction from occurring. During screen prediction,
 arguments to the screen are evaluated. Please ensure that evaluating
@@ -1993,11 +2195,16 @@ being shown. If the screen is not being shown, nothing happens. The with
 clause is interpreted the same way the ``with`` clause of a show statement
 is.
 
+Similar to the ``show screen`` statement, ``hide screen`` also takes the ``expression`` keyword,
+allowing to use an arbitrary expression as the screen name.
+
 ::
 
     hide screen rare_screen
     hide screen clock_screen with dissolve
     hide screen overlay_screen
+    $ screen_name = "some_screen"
+    hide screen expression screen_name
 
 Call Screen
 -----------
@@ -2028,6 +2235,9 @@ special keyword argument to the screen, as in the example below.
 Other ways of triggering transitions also work, such as the
 ``[ With(dissolve), Return() ]`` action list.
 
+Similar to the ``show screen`` statement, ``call screen`` also takes the ``expression`` keyword,
+allowing to use an arbitrary expression as the screen name.
+
 .. warning::
 
     If evaluating the arguments to a screen causes side-effects to occur,
@@ -2047,6 +2257,9 @@ Other ways of triggering transitions also work, such as the
     # Shows the screen with dissolve and hides it with pixellate.
     call screen my_other_screen(_with_none=False) with dissolve
     with pixellate
+
+    $ screen_name = "my_screen"
+    call screen expression screen_name pass (foo="bar")
 
 .. _screen-variants:
 
@@ -2153,3 +2366,15 @@ An example of defining a screen variant is:
         variant "small"
 
         text "Hello, World." size 30
+
+See also
+========
+
+:doc:`screen_actions` : a comprehensive list of actions and other tools
+to be used with screens.
+
+:doc:`screen_optimization` : some useful ways of making screens as
+efficient as possible.
+
+:doc:`screen_python` : go from using Ren'Py's predefined tools, to
+extending Ren'Py.

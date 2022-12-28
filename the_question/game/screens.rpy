@@ -366,7 +366,7 @@ screen main_menu():
             text "[config.name!t]":
                 style "main_menu_title"
 
-            text "[config.version!t]":
+            text _("Ren'Py 7+ Edition"):
                 style "main_menu_version"
 
 
@@ -790,19 +790,19 @@ screen preferences():
 
                     textbutton "English" text_font "DejaVuSans.ttf" action Language(None)
                     textbutton "Français" text_font "DejaVuSans.ttf" action Language("french")
-                    textbutton "Русский" text_font "DejaVuSans.ttf" action Language("russian")
                     textbutton "Bahasa Melayu" text_font "DejaVuSans.ttf" action Language("malay")
-                    textbutton "한국어" text_font "SourceHanSansLite.ttf" action Language("korean")
+                    textbutton "Русский" text_font "DejaVuSans.ttf" action Language("russian")
+                    textbutton "Español" text_font "DejaVuSans.ttf" action Language("spanish")
 
                 vbox:
                     style_prefix "radio"
                     label _(" ")
 
-
+                    textbutton "Українська" text_font "DejaVuSans.ttf" action Language("ukrainian")
+                    textbutton "日本語" text_font "SourceHanSansLite.ttf" action Language("japanese")
+                    textbutton "한국어" text_font "SourceHanSansLite.ttf" action Language("korean")
                     textbutton "简体中文" text_font "SourceHanSansLite.ttf" action Language("schinese")
                     textbutton "繁體中文" text_font "SourceHanSansLite.ttf" action Language("tchinese")
-                    textbutton "Español" text_font "DejaVuSans.ttf" action Language("spanish")
-                    textbutton "日本語" text_font "SourceHanSansLite.ttf" action Language("japanese")
 
 #end language_picker
 
@@ -974,7 +974,7 @@ screen history():
         if not _history_list:
             label _("The dialogue history is empty.")
 
-define gui.history_allow_tags = set()
+define gui.history_allow_tags = { "alt", "noalt", "rt", "rb", "art" }
 
 style history_window is empty
 
@@ -1371,7 +1371,7 @@ screen nvl(dialogue, items=None):
             use nvl_dialogue(dialogue)
 
         ## Displays the menu, if given. The menu may be displayed incorrectly if
-        ## config.narrator_menu is set to True, as it is above.
+        ## config.narrator_menu is set to True.
         for i in items:
 
             textbutton i.caption:

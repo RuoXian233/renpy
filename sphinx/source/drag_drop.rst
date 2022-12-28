@@ -22,7 +22,7 @@ something that can do both. The DragGroup class represents a group of
 Drags – for a drag and drop to occur, both Drags must be part of the
 same drag group.
 
-The drag and drop system can be used either through the :ref:`Screen
+The drag and drop system can be used either through the :doc:`Screen
 Language <screens>` or directly as displayables. It makes sense to use
 the screen language when you don't need to refer to the Drags that you
 create after they've been created. This might be the case if the
@@ -41,7 +41,7 @@ Examples
 An example of a say screen that allows the user to choose the location
 of the window by dragging it around the screen.::
 
-    screen say:
+    screen say(who, what):
 
         drag:
             drag_name "say"
@@ -121,9 +121,12 @@ send a character to a location::
 
 
 More complicated systems take significant programming skill to get
-right. The `Ren'Py cardgame framework <http://www.renpy.org/wiki/renpy/Frameworks#Cardgame>`_
-is both an example of how to use drag and drop in a complex
-system, and useful for making card games in its own right.
+right.
+
+..
+    The `Ren'Py cardgame framework <http://www.renpy.org/wiki/renpy/Frameworks#Cardgame>`_
+    is both an example of how to use drag and drop in a complex
+    system, and useful for making card games in its own right.
 
 .. _as-example:
 

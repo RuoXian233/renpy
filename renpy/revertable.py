@@ -330,6 +330,9 @@ class RevertableDict(dict):
         iterkeys = dict.keys
         iteritems = dict.items
 
+        def has_key(self, key):
+            return (key in self)
+
     def copy(self):
         rv = RevertableDict()
         rv.update(self)
@@ -462,6 +465,28 @@ class RevertableObject(object):
         self.__dict__.update(compressed)
 
 
+def checkpointing(method):
+
+    @_method_wrapper(method)
+    def do_checkpoint(self, *args, **kwargs):
+
+        renpy.game.context().force_checkpoint = True
+
+        return method(self, *args, **kwargs)
+
+    return do_checkpoint
+
+
+def list_wrapper(method):
+
+    @_method_wrapper(method)
+    def newmethod(*args, **kwargs):
+        l = method(*args, **kwargs)
+        return RevertableList(l)
+
+    return newmethod
+
+
 class RollbackRandom(random.Random):
     """
     This is used for Random objects returned by renpy.random.Random.
@@ -484,14 +509,17 @@ class RollbackRandom(random.Random):
     def _rollback(self, compressed):
         super(RollbackRandom, self).setstate(compressed)
 
-    setstate = mutator(random.Random.setstate)
+    setstate = checkpointing(mutator(random.Random.setstate))
 
     if PY2:
-        jumpahead = mutator(random.Random.jumpahead) # type: ignore
+        jumpahead = checkpointing(mutator(random.Random.jumpahead)) # type: ignore
+    else:
+        choices = list_wrapper(random.Random.choices)
+    sample = list_wrapper(random.Random.sample)
 
-    getrandbits = mutator(random.Random.getrandbits)
-    seed = mutator(random.Random.seed) # type: ignore
-    random = mutator(random.Random.random)
+    getrandbits = checkpointing(mutator(random.Random.getrandbits))
+    seed = checkpointing(mutator(random.Random.seed)) # type: ignore
+    random = checkpointing(mutator(random.Random.random))
 
     def Random(self, seed=None):
         """
@@ -505,7 +533,6 @@ class RollbackRandom(random.Random):
         new.seed(seed)
         return new
 
-
 class DetRandom(random.Random):
     """
     This is renpy.random.
@@ -514,6 +541,10 @@ class DetRandom(random.Random):
     def __init__(self):
         super(DetRandom, self).__init__()
         self.stack = [ ]
+
+    if not PY2:
+        choices = list_wrapper(random.Random.choices)
+    sample = list_wrapper(random.Random.sample)
 
     def random(self):
 
@@ -526,6 +557,8 @@ class DetRandom(random.Random):
 
         if log.current is not None:
             log.current.random.append(rv)
+
+        renpy.game.context().force_checkpoint = True
 
         return rv
 

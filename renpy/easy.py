@@ -19,7 +19,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# Functions that make the user's life easier.
+"""Functions that make the user's life easier."""
 
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # *
@@ -34,11 +34,16 @@ import renpy
 Color = renpy.color.Color
 color = renpy.color.Color
 
+if PY2:
+    from collections import Iterable # type: ignore
+else:
+    from collections.abc import Iterable
+
 
 def lookup_displayable_prefix(d):
     """
-    Given `d`, a string given a displayable, returns the displayale it
-    corresponds to or None if it it does not correspond to one.
+    Given `d`, a string given a displayable, returns the displayable it
+    corresponds to or None if it does not correspond to one.
     """
 
     prefix, colon, arg = d.partition(":")
@@ -258,3 +263,49 @@ def split_properties(properties, *prefixes):
             raise Exception("Property {} begins with an unknown prefix.".format(k))
 
     return rv
+
+def to_list(value, copy=False):
+    """
+    If the value is an iterable, turns it into a list, otherwise wraps it into one.
+    If a list is provided and `copy` is True, a new list will be returned.
+    """
+    if isinstance(value, list):
+        return list(value) if copy else value
+
+    if not isinstance(value, str) and isinstance(value, Iterable):
+        return list(value)
+
+    return [value]
+
+def to_tuple(value):
+    """
+    Same as to_list, but with tuples.
+    """
+    if isinstance(value, tuple):
+        return value
+
+    if not isinstance(value, str) and isinstance(value, Iterable):
+        return tuple(value)
+
+    return (value,)
+
+def run_callbacks(cb, *args, **kwargs):
+    """
+    Runs a callback or list of callbacks that do not expect results
+    """
+
+    if cb is None:
+        return None
+
+    if isinstance(cb, (list, tuple)):
+        rv = None
+
+        for i in cb:
+            new_rv = run_callbacks(i, *args, **kwargs)
+
+            if new_rv is not None:
+                rv = new_rv
+
+        return rv
+
+    return cb(*args, **kwargs)

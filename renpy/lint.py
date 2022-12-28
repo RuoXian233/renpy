@@ -65,7 +65,7 @@ error_reported = False
 
 def report(msg, *args):
     if report_node:
-        out = u"%s:%d " % (renpy.parser.unicode_filename(report_node.filename), report_node.linenumber)
+        out = u"%s:%d " % (renpy.lexer.unicode_filename(report_node.filename), report_node.linenumber)
     else:
         out = ""
 
@@ -510,13 +510,18 @@ def check_say(node):
 
         name = (char.image_tag,) + attributes
 
+        orig = name
+        f = renpy.config.adjust_attributes.get(name[0], None) or renpy.config.adjust_attributes.get(None, None)
+        if f is not None:
+            name = f(name)
+
         if image_exists_imprecise(name):
             continue
 
         if image_exists_imprecise(('side',) + name):
             continue
 
-        report("Could not find image (%s) corresponding to attributes on say statement.", " ".join(name))
+        report("Could not find image (%s) corresponding to attributes on say statement.", " ".join(orig))
 
 
 def check_menu(node):
@@ -708,6 +713,11 @@ def check_styles():
         check_style("Style " + name, s)
 
 
+def check_init(node):
+    if not (-999 <= node.priority <= 999):
+        report("The init priority ({}) is not in the -999 to 999 range.".format(node.priority))
+
+
 def humanize(n):
     s = str(n)
 
@@ -776,7 +786,6 @@ def report_character_stats(charastats):
     Returns a list of character stat lines.
     """
 
-    # Keep all the statistics in a list, so that it gets wrapped ionto a
     rv = [ "Character statistics (for default language):" ]
 
     count_to_char = collections.defaultdict(list)
@@ -790,7 +799,7 @@ def report_character_stats(charastats):
         if len(chars) == 1:
             start = chars[0] + " has "
         elif len(chars) == 2:
-            start = chars[0] + "  and " + chars[1] + " have "
+            start = chars[0] + " and " + chars[1] + " have "
         else:
             start = ", ".join(chars[:-1]) + ", and " + chars[-1] + " have "
 
@@ -888,7 +897,7 @@ def lint():
 
             counts[language].add(node.what)
             if language is None:
-                charastats[node.who if node.who else 'narrator' ] += 1
+                charastats[node.who or 'narrator' ] += 1
 
         elif isinstance(node, renpy.ast.Menu):
             check_menu(node)
@@ -930,6 +939,9 @@ def lint():
             check_define(node, "default")
             check_redefined(node, "default")
 
+        elif isinstance(node, renpy.ast.Init):
+            check_init(node)
+
     report_node = None
 
     check_styles()
@@ -938,6 +950,9 @@ def lint():
     for f in renpy.config.lint_hooks:
         f()
 
+    # list of either strings or lists of strings
+    # the elements of `lines` will be printed separated by blank lines
+    # the strings in lists in `lines` will be separated by simple carriage-returns
     lines = [ ]
 
     def report_language(language):
@@ -969,7 +984,7 @@ characters per block. """.format(
     print("")
 
     languages = list(counts)
-    languages.sort(key=lambda a : "" if not a else a)
+    languages.sort(key=lambda a : a or "")
     for i in languages:
         report_language(i)
 
@@ -991,7 +1006,7 @@ characters per block. """.format(
                 altprefix = "   "
                 ll = ll[3:]
             else:
-                prefix  = ""
+                prefix = ""
                 altprefix = ""
 
             for lll in textwrap.wrap(ll, 78 - len(prefix)):
@@ -1005,7 +1020,8 @@ characters per block. """.format(
 
     print("")
     if renpy.config.developer and (renpy.config.original_developer != "auto"):
-        print("Remember to set config.developer to False before releasing.")
+        print("Remember to set config.developer to False before releasing,")
+        print('or set it to "auto".')
         print("")
 
     print("Lint is not a substitute for thorough testing. Remember to update Ren'Py")

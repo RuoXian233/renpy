@@ -68,27 +68,30 @@ class ParameterInfo(object):
 
     def __init__(self, parameters, positional, extrapos, extrakw, last_posonly=None, first_kwonly=None):
 
-        # A list of parameter name, default value pairs.
+        # A list of (parameter name, default value) pairs.
+        # The default value is either None (if there is none)
+        # or a string which when evaluated results in the actual value
         self.parameters = parameters
 
-        # A list, giving the positional parameters to this function,
-        # in order.
+        # A list, giving the names of the positional parameters
+        # to this function, in order.
         self.positional = positional
 
         # A variable that takes the extra positional arguments, if
         # any. None if no such variable exists.
+        # If there is *args, this is "args".
         self.extrapos = extrapos
 
         # A variable that takes the extra keyword arguments, if
         # any. None if no such variable exists.
+        # If there is **properties, this is "properties".
         self.extrakw = extrakw
 
-        # A parameters that is positional-only, see
+        # The parameters which are positional-only, see
         # https://www.python.org/dev/peps/pep-0570/
-        # None if / not presets.
+        # Empty if / not present.
         if last_posonly is None:
             self.positional_only = [ ]
-
         else:
             rv = [ ]
             for param in parameters:
@@ -98,12 +101,11 @@ class ParameterInfo(object):
 
             self.positional_only = rv
 
-        # A parameters that is keyword-only, see
+        # The parameters which are keyword-only, see
         # https://www.python.org/dev/peps/pep-3102/
-        # None if * or *args not preset, or there are no parameters afterwards.
+        # Empty if * nor *args are present, or if there are no parameters after them.
         if first_kwonly is None:
             self.keyword_only = [ ]
-
         else:
             rv = [ ]
             for param in reversed(parameters):
@@ -382,9 +384,6 @@ def __newobj__(cls, *args):
     return cls.__new__(cls, *args)
 
 
-# A list of pyexprs that need to be precompiled.
-pyexpr_list = [ ]
-
 
 class PyExpr(str):
     """
@@ -411,6 +410,29 @@ class PyExpr(str):
 
     def __getnewargs__(self):
         return (str(self), self.filename, self.linenumber, self.py)
+
+    @staticmethod
+    def checkpoint():
+        """
+        Checkpoints the pyexpr list. Returns an opaque object that can be used
+        to revert the list.
+        """
+
+        if renpy.game.script.all_pyexpr is None:
+            return None
+
+        return len(renpy.game.script.all_pyexpr)
+
+    @staticmethod
+    def revert(opaque):
+
+        if renpy.game.script.all_pyexpr is None:
+            return
+
+        if opaque is None:
+            return
+
+        renpy.game.script.all_pyexpr[opaque:] = [ ]
 
 
 def probably_side_effect_free(expr):
@@ -789,7 +811,7 @@ class Say(Node):
             self.who = who.strip()
 
             # True if who is a simple enough expression we can just look it up.
-            if re.match(renpy.parser.word_regexp + "$", self.who):
+            if re.match(renpy.lexer.word_regexp + "$", self.who):
                 self.who_fast = True
             else:
                 self.who_fast = False
@@ -998,7 +1020,6 @@ class Label(Node):
 
     translation_relevant = True
     __slots__ = [
-        'name',
         'parameters',
         'block',
         'hide',
@@ -1058,8 +1079,8 @@ class Label(Node):
         renpy.store._args = None
         renpy.store._kwargs = None
 
-        if renpy.config.label_callback:
-            renpy.config.label_callback(self.name, renpy.game.context().last_abnormal)
+        renpy.easy.run_callbacks(renpy.config.label_callback, self.name, renpy.game.context().last_abnormal)
+        renpy.easy.run_callbacks(renpy.config.label_callbacks, self.name, renpy.game.context().last_abnormal)
 
     def restructure(self, callback):
         callback(self.block)
@@ -1223,6 +1244,8 @@ class Image(Node):
 class Transform(Node):
 
     __slots__ = [
+        # The name of the store this transform is stored in.
+        'store',
 
         # The name of the transform.
         'varname',
@@ -1236,16 +1259,25 @@ class Transform(Node):
 
     default_parameters = EMPTY_PARAMETERS
 
-    def __init__(self, loc, name, atl=None, parameters=default_parameters):
+    def __new__(cls, *args, **kwargs):
+        self = Node.__new__(cls)
+        self.store = 'store'
+        return self
+
+    def __init__(self, loc, store, name, atl=None, parameters=default_parameters):
 
         super(Transform, self).__init__(loc)
 
+        self.store = store
         self.varname = name
         self.atl = atl
         self.parameters = parameters
 
     def diff_info(self):
-        return (Transform, self.varname)
+        return (Transform, self.store, self.varname)
+
+    def early_execute(self):
+        create_store(self.store)
 
     def execute(self):
 
@@ -1260,7 +1292,9 @@ class Transform(Node):
         trans = renpy.display.motion.ATLTransform(self.atl, parameters=parameters)
         renpy.dump.transforms.append((self.varname, self.filename, self.linenumber))
         renpy.exports.pure(self.varname)
-        setattr(renpy.store, self.varname, trans)
+
+        ns, _special = get_namespace(self.store)
+        ns.set(self.varname, trans)
 
     def analyze(self):
 
@@ -1311,7 +1345,7 @@ def predict_imspec(imspec, scene=False, atl=None):
         except Exception:
             pass
 
-    layer = renpy.exports.default_layer(layer, tag or name, expression)
+    layer = renpy.exports.default_layer(layer, tag or name, bool(expression))
 
     if scene:
         renpy.game.context().images.predict_scene(layer)
@@ -1346,7 +1380,7 @@ def show_imspec(imspec, atl=None):
 
     at_list = [ renpy.python.py_eval(i) for i in at_list ]
 
-    layer = renpy.exports.default_layer(layer, tag or name, expression and (tag is None))
+    layer = renpy.exports.default_layer(layer, tag or name, bool(expression) and (tag is None))
 
     renpy.config.show(name,
                       at_list=at_list,
@@ -1635,7 +1669,7 @@ class With(Node):
         else:
             paired = None
 
-        renpy.exports.with_statement(trans, paired)
+        renpy.exports.with_statement(trans, paired=paired)
 
     def predict(self):
 
@@ -1738,7 +1772,6 @@ class Return(Node):
     # We don't care what the next node is.
     def chain(self, next): # @ReservedAssignment
         self.next = None
-        return
 
     def execute(self):
 
@@ -1941,7 +1974,6 @@ class Jump(Node):
     # We don't care what our next node is.
     def chain(self, next): # @ReservedAssignment
         self.next = None
-        return
 
     def execute(self):
 
@@ -2122,6 +2154,7 @@ class UserStatement(Node):
         'translation_relevant',
         'rollback',
         'subparses',
+        'init_priority',
         ]
 
     def __new__(cls, *args, **kwargs):
@@ -2132,6 +2165,7 @@ class UserStatement(Node):
         self.translation_relevant = False
         self.rollback = "normal"
         self.subparses = [ ]
+        self.init_priority = 0
         return self
 
     def __init__(self, loc, line, block, parsed):
@@ -2142,6 +2176,7 @@ class UserStatement(Node):
         self.line = line
         self.block = block
         self.subparses = [ ]
+        self.init_priority = 0
 
         self.name = self.call("label")
         self.rollback = renpy.statements.get("rollback", self.parsed) or "normal"
@@ -2177,7 +2212,7 @@ class UserStatement(Node):
 
         for i in self.subparses:
             if i.block[0] is old:
-                self.code_block.insert(0, new)
+                i.block.insert(0, new)
 
     def restructure(self, callback):
         if self.code_block:
@@ -2203,7 +2238,7 @@ class UserStatement(Node):
         self.call("execute_init")
 
     def get_init(self):
-        return 0, self.execute_init
+        return self.init_priority, self.execute_init
 
     def execute(self):
         next_node(self.get_next())

@@ -1222,7 +1222,33 @@ cdef class Render:
             screen = self.focus_screen
 
         if self.modal:
-            focuses[:] = [ ]
+
+            if self.modal == "window":
+
+                x1, y1 = transform.transform(0, 0)
+                x2, y2 = transform.transform(self.width, self.height)
+
+                minx = min(x1, x2)
+                maxx = max(x1, x2)
+                miny = min(y1, y2)
+                maxy = max(y1, y2)
+
+                new_focuses = [ ]
+
+                rect = (minx, miny, maxx - minx, maxy - miny)
+
+                for f in focuses:
+
+                    if f.inside(rect):
+                        continue
+
+                    new_focuses.append(f)
+
+                focuses[:] = new_focuses
+
+            elif not callable(self.modal):
+
+                focuses[:] = [ ]
 
         if self.focuses:
 
@@ -1374,7 +1400,14 @@ cdef class Render:
                     rv = None
 
         if (rv is None) and self.modal:
-            if renpy.display.layout.check_modal(self.modal, None, x, y, self.width, self.height):
+            w = self.width
+            h = self.height
+
+            if self.modal == "default":
+                w = None
+                h = None
+
+            if renpy.display.layout.check_modal(self.modal, None, x, y, w, h):
                 return Modal
 
         return rv
@@ -1521,7 +1554,7 @@ cdef class Render:
 
             render = renpy.display.render.render(d, width, height, st, at)
 
-        d.place(self, x, y, width, height, render, main=main)
+        return d.place(self, x, y, width, height, render, main=main)
 
     def zoom(self, xzoom, yzoom):
         """

@@ -333,7 +333,7 @@ def remove_above(d):
 
 def at(transform):
     """
-    :doc: ui
+    :undocumented:
 
     Specifies a transform that is applied to the next displayable to
     be created. This is largely obsolete, as all UI functions now take
@@ -350,7 +350,7 @@ def clear():
 
 def detached():
     """
-    :doc: ui
+    :undocumented:
 
     Do not add the next displayable to any later or container. Use this if
     you want to assign the result of a ui function to a variable.
@@ -363,7 +363,7 @@ def detached():
 
 def layer(name):
     """
-    :doc: ui
+    :undocumented:
 
     Adds displayables to the layer named `name`. The later must be
     closed with :func:`ui.close`.
@@ -374,7 +374,7 @@ def layer(name):
 
 def close(d=None):
     """
-    :doc: ui
+    :undocumented:
     :args: ()
 
     Closes a displayable created with by a UI function. When a
@@ -400,7 +400,7 @@ def context_enter(w):
     if isinstance(renpy.ui.stack[-1], renpy.ui.Many) and renpy.ui.stack[-1].displayable is w: # type: ignore
         return
 
-    raise Exception("%r cannot be used as a context manager.", type(w).__name__)
+    raise Exception("%r cannot be used as a context manager." % type(w).__name__)
 
 
 def context_exit(w):
@@ -527,7 +527,7 @@ class Wrapper(renpy.object.Object):
         try:
             w = self.function(*args, **keyword)
         except TypeError as e:
-            etype, e, tb = sys.exc_info()
+            _etype, e, tb = sys.exc_info()
 
             if tb.tb_next is None:
                 e.args = (e.args[0].replace("__call__", "ui." + self.name),) # type: ignore
@@ -1416,7 +1416,7 @@ returns = renpy.curry.curry(_returns)
 def _jumps(label, transition=None):
 
     if isinstance(transition, basestring):
-        transition = getattr(renpy.config, transition)
+        transition = getattr(renpy.config, transition) # type: ignore
 
     if transition is not None:
         renpy.exports.transition(transition)
@@ -1462,7 +1462,7 @@ on = Wrapper(renpy.display.behavior.OnEvent)
 
 def screen_id(id_, d):
     """
-    :doc: ui
+    :undocumented:
 
     Assigns the displayable `d` the screen widget id `id_`, as if it had
     been created by a screen statement with that id.

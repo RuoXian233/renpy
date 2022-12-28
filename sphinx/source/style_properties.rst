@@ -1,10 +1,8 @@
-.. _style-properties:
-
 ================
 Style Properties
 ================
 
-The style properties associated with :ref:`styles <styles>` control how
+The style properties associated with :doc:`styles <style>` control how
 Displayables are shown. Style properties can be either given without a prefix,
 in which case they apply to all states of the displayable, or with a prefix
 that limits the property to a limited number of states.
@@ -243,7 +241,7 @@ or on the screen when not inside a layout.
 .. style-property:: alt string or None
 
     Alternative text used for the displayable when self-voicing is
-    enabled. See the :ref:`self voicing <self-voicing>` section for
+    enabled. See the :doc:`self voicing <self_voicing>` section for
     more information.
 
 .. style-property:: xpos position
@@ -319,10 +317,10 @@ or on the screen when not inside a layout.
     Gives a number of pixels that are added to the vertical position
     computed using ypos and yalign.
 
-.. style-property:: offset tuple of (position, position)
+.. style-property:: offset tuple of (int, int)
 
-    Equivalent to setting xpos to the first component of the tuple,
-    and ypos to the second component of the tuple.
+    Equivalent to setting xoffset to the first component of the tuple,
+    and yoffset to the second component of the tuple.
 
 .. style-property:: xmaximum int
 
@@ -506,8 +504,8 @@ Text Style Properties
 
 .. style-property:: language string
 
-    Controls the language family used to break text into lines. Legal
-    values are:
+    Controls the language family used to break text into lines, and
+    for certain other text transformations. Legal values are:
 
     ``"unicode"`` (default)
         Uses the Unicode linebreaking algorithm, which is suitable for
@@ -531,6 +529,12 @@ Text Style Properties
     ``"korean-with-spaces"``
         Used for Korean text delimited by whitespace. This prevents linebreaking
         between adjacent Korean characters.
+
+    ``"thaic90"``
+        Used for Thai text displayed in fonts that support the
+        `C90 encoding for Thai <http://www.bakoma-tex.com/doc/fonts/enc/c90/c90.pdf>`_.
+        This combines groups of characters into single glyphs, allowing for better
+        display of vowel and tone marks. Line breaking uses the unicode algorithm.
 
     ``"western"``
         Allows breaking only at whitespace. Suitable for most
@@ -607,7 +611,9 @@ Text Style Properties
 
     will always produce a 1 pixel-wide border.
 
-    Outlines only work with TrueType fonts.
+    Outlines only work with TrueType fonts. Outlines only work when applied
+    to an entire Text displayable. They do not work when applied to a hyperlink,
+    text tag, or other method that applies to only a portion of the text.
 
 .. style-property:: outline_scaling string
 

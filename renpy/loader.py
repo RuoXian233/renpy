@@ -265,7 +265,7 @@ def index_archives():
                     if archive_handled == True:
                         break
 
-    for dir, fn in listdirfiles(): # @ReservedAssignment
+    for _dir, fn in listdirfiles():
         lower_map[unicodedata.normalize('NFC', fn.lower())] = fn
 
     for fn in remote_files:
@@ -460,6 +460,7 @@ def listdirfiles(common=True):
 
 
 class SubFile(object):
+    closed = False
 
     def __init__(self, fn, base, length, start):
         self.fn = fn
@@ -511,6 +512,9 @@ class SubFile(object):
 
         return (rv1 + rv2)
 
+    def readable(self):
+        return True
+
     def readline(self, length=None):
 
         if self.f is None:
@@ -559,6 +563,12 @@ class SubFile(object):
             rv.append(l)
 
         return rv
+
+    def seekable(self):
+        return True
+
+    def writable(self):
+        return False
 
     def xreadlines(self):
         return self
@@ -887,7 +897,7 @@ def transfn(name):
     raise Exception("Couldn't find file '%s'." % name)
 
 
-hash_cache = dict()
+hash_cache = {}
 
 
 def get_hash(name): # type: (str) -> int
@@ -1097,8 +1107,6 @@ def auto_thread_function():
     This thread sets need_autoreload when necessary.
     """
 
-    global needs_autoreload
-
     while True:
 
         with auto_lock:
@@ -1163,9 +1171,10 @@ def auto_init():
 
     auto_quit_flag = False
 
-    auto_thread = threading.Thread(target=auto_thread_function)
-    auto_thread.daemon = True
-    auto_thread.start()
+    if not renpy.emscripten:
+        auto_thread = threading.Thread(target=auto_thread_function)
+        auto_thread.daemon = True
+        auto_thread.start()
 
 
 def auto_quit():

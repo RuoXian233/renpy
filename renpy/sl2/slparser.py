@@ -21,7 +21,7 @@
 
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # *
-
+from typing import Any, Callable, Literal
 
 
 import collections
@@ -422,7 +422,7 @@ many = renpy.object.Sentinel("many")
 def register_sl_displayable(*args, **kwargs):
     """
     :doc: custom_sl class
-    :args: (name, displayable, style, nchildren=0, scope=False, replaces=False, default_keywords={}, default_properties=True)
+    :args: (name, displayable, style, nchildren=0, scope=False, replaces=False, default_keywords={}, default_properties=True, unique=False)
 
     Registers a screen language statement that creates a displayable.
 
@@ -458,6 +458,10 @@ def register_sl_displayable(*args, **kwargs):
         "many"
             The displayable takes more than one child.
 
+
+    `unique`
+        This should be set to true if the function returns a  displayable with
+        no other references to it.
 
     The following arguments should be passed in using keyword arguments:
 
@@ -510,9 +514,11 @@ def register_sl_displayable(*args, **kwargs):
         * "text"
         * "window"
 
-        These correspond to groups of :ref:`style-properties`. Group can
+        These correspond to groups of :doc:`style_properties`. Group can
         also be "ui", in which case it adds the :ref:`common ui properties <common-properties>`.
     """
+
+    kwargs.setdefault("unique", False)
 
     rv = DisplayableParser(*args, **kwargs)
 
@@ -537,10 +543,10 @@ class DisplayableParser(Parser):
 
     def __init__(self, name, displayable, style, nchildren=0, scope=False,
                  pass_context=False, imagemap=False, replaces=False, default_keywords={},
-                 hotspot=False, default_properties=True):
+                 hotspot=False, default_properties=True, unique=False): # type: (str, Callable, str, int|Literal["many"]|renpy.object.Sentinel, bool, bool, bool, bool, dict[str, Any], bool, bool, bool) -> None
         """
         `scope`
-            If true, the scope is passed into the displayable functionas a keyword
+            If true, the scope is passed into the displayable function as a keyword
             argument named "scope".
 
         `pass_context`
@@ -581,6 +587,7 @@ class DisplayableParser(Parser):
         self.replaces = replaces
         self.default_keywords = default_keywords
         self.variable = True
+        self.unique = unique
 
         Keyword("arguments")
         Keyword("properties")
@@ -605,6 +612,8 @@ class DisplayableParser(Parser):
             replaces=self.replaces,
             default_keywords=self.default_keywords,
             hotspot=self.hotspot,
+            name=self.name,
+            unique=self.unique,
             )
 
         for _i in self.positional:

@@ -136,6 +136,8 @@ cdef class Matrix:
         for i in range(16):
             rv[fields[i]] = self.m[i]
 
+        rv["origin"] = getattr(self, "origin", None)
+
         return rv
 
     def __setstate__(self, state):
@@ -148,6 +150,8 @@ cdef class Matrix:
         for i in range(16):
             if fields[i] in state:
                 self.m[i] = state[fields[i]]
+
+        self.origin = state.get("origin", None)
 
     def __mul__(Matrix self, Matrix other):
 
@@ -200,23 +204,26 @@ cdef class Matrix:
         elif components == 4:
             return (ox, oy, oz, ow)
 
-    def __richcmp__(Matrix self, Matrix other, op):
-
-        if op != 2:
-            return NotImplemented
-
+    def __eq__(Matrix self, other):
         if self is other:
             return True
 
+        if type(self) != type(other):
+            return False
+
         cdef int i
         cdef double total
+        cdef Matrix other_matrix = other
 
         total = 0
 
         for 0 < i < 16:
-            total += abs(self.m[i] - other.m[i])
+            total += abs(self.m[i] - other_matrix.m[i])
 
         return total < .0001
+
+    def __ne__(Matrix self, other):
+        return not (self == other)
 
     cpdef bint is_unit_aligned(Matrix self):
         """

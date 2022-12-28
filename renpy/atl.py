@@ -256,8 +256,7 @@ class Context(object):
         self.context = context
 
     def eval(self, expr): # @ReservedAssignment
-        expr = renpy.python.escape_unicode(expr)
-        return eval(expr, renpy.store.__dict__, self.context) # @UndefinedVariable
+        return renpy.python.py_eval(expr, locals=self.context)
 
     def __eq__(self, other):
         if not isinstance(other, Context):
@@ -752,7 +751,7 @@ class RawBlock(RawStatement):
             block = self.compile(Context({}))
         except RuntimeError:  # PY3: RecursionError
             raise Exception("This transform refers to itself in a cycle.")
-        except:
+        except Exception:
             self.constant = NOT_CONST
         else:
             self.compiled_block = block
@@ -1155,8 +1154,6 @@ class Child(Statement):
             child = self.transition(old_widget=old_child,
                                     new_widget=child)
             child._unique()
-        else:
-            child = child
 
         trans.set_child(child, duplicate=False)
         trans.raw_child = self.child
@@ -1191,14 +1188,9 @@ class Interpolation(Statement):
 
         warper = warpers.get(self.warper, self.warper)
 
-        if trans.atl.animation:
-            st_or_at = trans.at
-        else:
-            st_or_at = trans.st
-
         # Special case `pause 0` to always display a frame. This is intended to
         # support single-frame animations that shouldn't skip.
-        if self.warper == "pause" and self.duration == 0 and renpy.config.atl_one_frame:
+        if state is None and self.warper == "pause" and self.duration == 0 and renpy.config.atl_one_frame:
             force_frame = True
         else:
             force_frame = False
@@ -1738,12 +1730,18 @@ class Function(Statement):
         return True
 
     def execute(self, trans, st, state, events):
-        fr = self.function(trans, st, trans.at)
+        block = state or renpy.config.atl_function_always_blocks
+
+        fr = self.function(trans, st if block else 0, trans.at)
+
+        if (not block) and (fr is not None):
+           block = True
+           fr = self.function(trans, st, trans.at)
 
         if fr is not None:
-            return "continue", None, fr
+            return "continue", True, fr
         else:
-            return "next", st, None
+            return "next", 0 if block else st, None
 
 
 # This parses an ATL block.

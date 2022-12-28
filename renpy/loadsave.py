@@ -326,9 +326,14 @@ class SaveRecord(object):
 
         # For speed, copy the file after we've written it at least once.
         if self.first_filename is not None:
-            shutil.copyfile(self.first_filename, filename_new)
-            safe_rename(filename_new, filename)
-            return
+            try:
+                shutil.copyfile(self.first_filename, filename_new)
+            except OSError as e:
+                if renpy.config.developer:
+                    raise e
+            else:
+                safe_rename(filename_new, filename)
+                return
 
         with zipfile.ZipFile(filename_new, "w", zipfile.ZIP_DEFLATED) as zf:
             # Screenshot.
@@ -436,10 +441,13 @@ autosave_not_running.set()
 # The number of times autosave has been called without a save occuring.
 autosave_counter = 0
 
+# True if a background autosave has finished.
+did_autosave = False
 
 def autosave_thread_function(take_screenshot):
 
     global autosave_counter
+    global did_autosave
 
     try:
 
@@ -457,6 +465,8 @@ def autosave_thread_function(take_screenshot):
 
             save("auto-1", mutate_flag=True, extra_info=extra_info)
             autosave_counter = 0
+
+            did_autosave = True
 
         except Exception:
             pass
@@ -517,6 +527,9 @@ def force_autosave(take_screenshot=False, block=False):
     """
 
     global autosave_thread
+
+    if not renpy.config.has_autosave:
+        return
 
     if renpy.game.after_rollback or renpy.exports.in_rollback():
         return

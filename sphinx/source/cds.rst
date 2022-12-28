@@ -32,7 +32,7 @@ Using a CDS allows you to:
 
 - Predict Displayables (If the function uses them)
 
-- Give you addition information during lint (If at runtime an error was ignored you can have a report here).
+- Give you addition information during :ref:`lint` (If at runtime an error was ignored you can have a report here).
 
 For example, the above behaviour, but written as a CDS:
 
@@ -57,7 +57,7 @@ For example, the above behaviour, but written as a CDS:
 
         def lint_random(parsed_object):
             for i in parsed_object:
-                renpy.check_text_tags(i.what)
+                renpy.error(renpy.check_text_tags(i.what))
 
 
         renpy.register_statement(
@@ -95,8 +95,8 @@ Creator-Defined Statements (CDS) must conform to the following rules:
 - They cannot be used in the same file in which they are defined.
 
 - The file containing the CDS must be loaded earlier than any file that uses it.
-(Since Ren'Py loads files in Unicode sort order, it generally makes sense to
-prefix the name of any file containing a CDS with 01 or some other small number.)
+  (Since Ren'Py loads files in the Unicode sort order of their path, it generally makes sense to
+  prefix the name of any file containing a CDS with 01 or some other small number.)
 
 Creator-Defined Statements are registered using the :func:`renpy.register_statement`
 function. This functions takes other functions that perform operations on the content of the CDS.
@@ -368,7 +368,7 @@ A custom statement's parse function takes an instance of a Lexer object.
                 ll = l.subblock_lexer()
 
                 while ll.advance():
-                    with ll.catch_errors():
+                    with ll.catch_error():
                         strings.append(ll.require(ll.string))
                         ll.expect_noblock("string inside mystatement")
                         ll.expect_eol()

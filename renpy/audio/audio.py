@@ -418,12 +418,13 @@ class Channel(object):
         # Update the channel volume.
 
         mixer_volume = renpy.game.preferences.volumes.get(self.mixer, 1.0)
+        main_volume = renpy.game.preferences.volumes.get("main", 1.0)
 
         if renpy.game.preferences.self_voicing:
             if self.mixer not in renpy.config.voice_mixers:
                 mixer_volume = mixer_volume * renpy.game.preferences.self_voicing_volume_drop
 
-        vol = self.chan_volume * mixer_volume
+        vol = self.chan_volume * mixer_volume * main_volume
 
         if renpy.game.preferences.mute.get(self.mixer, False):
             vol = 0.0
@@ -518,9 +519,9 @@ class Channel(object):
                 renpysound.set_video(self.number, self.movie)
 
                 if depth == 0:
-                    renpysound.play(self.number, topf, topq.filename, paused=self.synchro_start, fadein=topq.fadein, tight=topq.tight, start=start, end=end, relative_volume=topq.relative_volume)
+                    renpysound.play(self.number, topf, topq.filename, paused=self.synchro_start, fadein=topq.fadein, tight=topq.tight, start=start, end=end, relative_volume=topq.relative_volume) # type:ignore
                 else:
-                    renpysound.queue(self.number, topf, topq.filename, fadein=topq.fadein, tight=topq.tight, start=start, end=end, relative_volume=topq.relative_volume)
+                    renpysound.queue(self.number, topf, topq.filename, fadein=topq.fadein, tight=topq.tight, start=start, end=end, relative_volume=topq.relative_volume) # type:ignore
 
                 self.playing = True
 
@@ -783,19 +784,36 @@ all_channels = [ ]
 channels = { }
 
 
-def register_channel(name, mixer=None, loop=None, stop_on_mute=True, tight=False, file_prefix="", file_suffix="", buffer_queue=True, movie=False, framedrop=True):
+def register_channel(name,
+                     mixer=None,
+                     loop=None,
+                     stop_on_mute=True,
+                     tight=False,
+                     file_prefix="",
+                     file_suffix="",
+                     buffer_queue=True,
+                     movie=False,
+                     framedrop=True,
+                     force=False):
     """
     :doc: audio
+    :args: (name, mixer, loop=None, stop_on_mute=True, tight=False, file_prefix="", file_suffix="", buffer_queue=True, movie=False, framedrop=True)
 
     This registers a new audio channel named `name`. Audio can then be
     played on the channel by supplying the channel name to the play or
     queue statements.
 
+    `name`
+        The name of the channel. It should not contain spaces, as this is reserved
+        for Ren'Py's internal use, and should be a
+        `valid identifier <https://docs.python.org/reference/lexical_analysis.html#identifiers>`__
+        for the syntax of the :ref:`play-statement` to be usable.
+
     `mixer`
-        The name of the mixer the channel uses. By default, Ren'Py
-        knows about the "music", "sfx", and "voice" mixers. Using
-        other names is possible, but may require changing the
-        preferences screens.
+        The name of the mixer the channel uses. By default, Ren'Py knows about
+        the "music", "sfx", and "voice" mixers. Using other names is possible,
+        and will create the mixer if it doesn't already exist, but making new
+        mixers reachable by the player requires changing the preferences screens.
 
     `loop`
         If true, sounds on this channel loop by default.
@@ -832,7 +850,7 @@ def register_channel(name, mixer=None, loop=None, stop_on_mute=True, tight=False
     if name == "movie":
         movie = True
 
-    if not renpy.game.context().init_phase and (" " not in name):
+    if not force and not renpy.game.context().init_phase and (" " not in name):
         raise Exception("Can't register channel outside of init phase.")
 
     if renpy.android and renpy.config.hw_video and name == "movie":
@@ -946,8 +964,8 @@ def init():
             pcm_ok = True
         except Exception:
 
-            if renpy.config.debug_sound:
-                raise
+            renpy.display.log.write("Sound init failed. Proceeding anyway.")
+            renpy.display.log.exception()
 
             os.environ["SDL_AUDIODRIVER"] = "dummy"
 
@@ -974,14 +992,16 @@ def init():
 
         periodic_thread_quit = False
 
-        periodic_thread = threading.Thread(target=periodic_thread_main)
-        periodic_thread.daemon = True
-        periodic_thread.start()
+        if not renpy.emscripten:
+            periodic_thread = threading.Thread(target=periodic_thread_main)
+            periodic_thread.daemon = True
+            periodic_thread.start()
+        else:
+            periodic_thread = None
 
 
 def quit(): # @ReservedAssignment
 
-    global periodic_thread
     global periodic_thread_quit
 
     global pcm_ok
@@ -1196,6 +1216,16 @@ def interact():
                 raise
 
     periodic()
+
+def pump():
+    """
+    Used to implement renpy.music.pump.
+    """
+
+    interact()
+
+    with lock:
+        periodic_pass()
 
 
 def rollback():

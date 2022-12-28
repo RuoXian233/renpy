@@ -25,6 +25,10 @@
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from typing import Any
 
+# Initial import of the __main__ module. This gets replaced in renpy.py
+# whatever that module has been imported as.
+import __main__
+
 # All imports should go below renpy.compat.
 
 # Backup object, as it'll be overwritten when renpy.object is imported.
@@ -44,7 +48,7 @@ def update_path():
 
     try:
         import _renpy
-        if hasattr(_renpy, '__file__'): # .so/.dll
+        if hasattr(_renpy, '__file__') and _renpy.__file__ != "built-in":
             libexec = os.path.dirname(_renpy.__file__)
             package.__path__.append(os.path.join(libexec, *name))
     except ImportError:
@@ -63,6 +67,7 @@ import os
 import copy
 import types
 import site
+from collections import namedtuple
 
 ################################################################################
 # Version information
@@ -78,10 +83,12 @@ except ImportError:
 
 official = official and getattr(site, "renpy_build_official", False)
 
+VersionTuple = namedtuple("VersionTuple", ["major", "minor", "patch", "commit"])
+
 if PY2:
 
     # The tuple giving the version number.
-    version_tuple = (7, 5, 0, vc_version)
+    version_tuple = VersionTuple(7, 6, 0, vc_version)
 
     # The name of this version.
     version_name = "TBD"
@@ -89,10 +96,10 @@ if PY2:
 else:
 
     # The tuple giving the version number.
-    version_tuple = (8, 0, 0, vc_version)
+    version_tuple = VersionTuple(8, 1, 0, vc_version)
 
     # The name of this version.
-    version_name = "Heck Freezes Over"
+    version_name = "TBD"
 
 # A string giving the version number only (8.0.1.123), with a suffix if needed.
 version_only = ".".join(str(i) for i in version_tuple)
@@ -179,6 +186,8 @@ elif sys.platform == 'emscripten' or "RENPY_EMSCRIPTEN" in os.environ:
 else:
     linux = True
 
+arch = os.environ.get("RENPY_PLATFORM", "unknown-unknown-unknown").rpartition("-")[2]
+
 # A flag that's true if we're on a smartphone or tablet-like platform.
 mobile = android or ios or emscripten
 
@@ -252,7 +261,7 @@ name_blacklist = {
     "renpy.audio.audio.lock",
     "renpy.audio.audio.periodic_condition",
     "renpy.webloader.queue_lock",
-    "renpy.persistent.save_MP_instances",
+    "renpy.persistent.MP_instances",
     "renpy.exports.sdl_dll",
     }
 
@@ -348,7 +357,7 @@ class Backup(_object):
 
         # Remove new variables from the module.
         for mod, names in self.names.items():
-            modvars = vars(mod)
+            modvars = mod.__dict__
             for name in set(modvars.keys()) - names:
                 del modvars[name]
 
@@ -421,6 +430,7 @@ def import_all():
     import renpy.color
     import renpy.easy
     import renpy.execution
+    import renpy.lexer
     import renpy.loadsave
     import renpy.savelocation # @UnresolvedImport
     import renpy.persistent
@@ -599,7 +609,7 @@ def post_import():
     # Import everything into renpy.exports, provided it isn't
     # already there.
     for k, v in globals().items():
-        vars(renpy.exports).setdefault(k, v)
+        renpy.exports.__dict__.setdefault(k, v)
 
 
 def issubmodule(sub, module):
@@ -700,6 +710,7 @@ if 1 == 0:
     from . import game
     from . import gl
     from . import gl2
+    from . import lexer
     from . import lint
     from . import loader
     from . import loadsave

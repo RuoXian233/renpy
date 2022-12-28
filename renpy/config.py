@@ -160,11 +160,11 @@ overlay_layers = [ 'overlay' ]
 
 # A list of layers that should be cleared when we enter a
 # new context.
-context_clear_layers = [ 'screens' ]
+context_clear_layers = [ 'screens', 'top', 'bottom' ]
 
 # A list of layers that are displayed atop all other layers, and do
 # not participate in transitions.
-top_layers = [ ]
+top_layers = [ 'top' ]
 
 # True if we want to show overlays during wait statements, or
 # false otherwise.
@@ -229,8 +229,10 @@ font_replacement_map = { }
 
 # A callback that is called when a with statement (but not
 # the with clause of a say or menu statement) executes. If not None,
-# it's called with a single argument, the transition supplied to the
-# with clause.
+# it's called with a two arguments, the transition supplied to the
+# with clause and the transition it is paired with. The latter is
+# None except in the case of the implicit None transition produced
+# by inline with statements.
 with_callback = None
 
 # The framerate limit, in frames per second.
@@ -356,8 +358,10 @@ missing_scene = None
 missing_show = None
 missing_hide = None
 
-# This is called when control is transferred to a label.
+# This is called when control is transferred to a label. (label_callbacks is
+# kept as an old name for label_callbacks.)
 label_callback = None
+label_callbacks = [ ]
 
 # A function that is called when the window needs to be shown.
 empty_window = None
@@ -395,8 +399,8 @@ screenshot_crop = None
 gamedir = ""
 basedir = ""
 renpy_base = ""
-commondir = ""  # type: Optional[str]
-logdir = ""  # type: Optional[str] # Where log and error files go.
+commondir = None  # type: Optional[str]
+logdir = None  # type: Optional[str] # Where log and error files go.
 
 # Should we enable OpenGL mode?
 gl_enable = True
@@ -466,7 +470,7 @@ log_enable = True
 debug_text_overflow = False
 
 # Should underfull grids raise an exception?
-allow_underfull_grids = False
+allow_underfull_grids = True
 
 # Should we save the window size in the preferences?
 save_physical_size = True
@@ -563,7 +567,7 @@ autosave_on_input = True
 emphasize_audio_channels = [ 'voice' ]
 
 # What we should lower the volume of non-emphasized channels to.
-emphasize_audio_volume = 0.5
+emphasize_audio_volume = 0.8
 
 # How long we should take to raise and lower the volume when emphasizing
 # audio.
@@ -831,6 +835,9 @@ say_arguments_callback = None
 # Should we show an atl interpolation for one frame?
 atl_one_frame = True
 
+# Should function statements in ATL block fast-forward?
+atl_function_always_blocks = False
+
 # Should we keep the show layer state?
 keep_show_layer_state = True
 
@@ -976,6 +983,9 @@ ftfont_vertical_extent_scale = { }
 
 # The default shader.
 default_shader = "renpy.geometry"
+
+# If True, the volume of a channel is shown when it is mute.
+preserve_volume_when_muted = False
 
 
 def say_attribute_transition_callback(*args):
@@ -1173,7 +1183,7 @@ compat_viewport_minimum = False
 webaudio = True
 
 # A list of audio types that are required to fully enable webaudio.
-webaudio_required_types = [ "audio/ogg", "audio/mp3" ]
+webaudio_required_types = [ "audio/ogg", "audio/mpeg" ]
 
 # If not None, a callback that can be used to alter audio filenames.
 audio_filename_callback = None
@@ -1197,7 +1207,7 @@ raise_image_exceptions = True
 relative_transform_size = True
 
 # Should tts of layers be from front to back?
-tts_front_to_back = True
+tts_front_to_back = False
 
 # Should live2d loading be logged to log.txt
 log_live2d_loading = False
@@ -1222,8 +1232,8 @@ lint_character_statistics = True
 # Should vpgrids be allowed to raise under/overfull errors ?
 allow_unfull_vpgrids = False
 
-# Should vbox and hbox skip false showifs?
-box_skip_false_showif = True
+# Should vbox and hbox skip non-visible children?
+box_skip = True
 
 # What should be the default value of the crop_relative tpref ?
 crop_relative_default = True
@@ -1242,13 +1252,89 @@ call_screen_roll_forward = False
 # displayed during a choice menu.
 choice_empty_window = None
 
+# The encoding that's used by renpy.open_file by default. False
+# means to use binary mode.
+open_file_encoding = os.environ.get("RENPY_OPEN_FILE_ENCODING", False)
+
+# A callback that can modify the gl2 window flags.
+gl2_modify_window_flags = None
+
+# Should the skip key (ctrl) function during text?
+skip_during_text = False
+
+# An alternate path to use when uneliding. (Mostly used by the launcher to enable
+# the style inspector.)
+alternate_unelide_path = None
+
+# Should modal block pause?
+modal_blocks_pause = True
+
+# Should modal block timers?
+modal_blocks_timer = False
+
+# The range, in decibels, of the volume mixers.
+volume_db_range = 60
+
+# Autosave callback.
+autosave_callback = None
+
+# The radius the mouse has to move before triggering a viewport drag.
+viewport_drag_radius = 10
+
+# A list of callbacks that are called when the scene statement or renpy.scene
+# function is run.
+scene_callbacks = [ ]
+
+# The physical width and heigh of the game window. If None, the window defaults
+# to config.screen_width and config.screen_height.
+physical_width = None
+physical_height = None
+
+# If true, lenticular brackets can be used to encode ruby text.
+lenticular_bracket_ruby = True
+
+# If true, the web implentation of renpy.input will be used.
+web_input = True
+
+# Layers below all other layers, that do not participate in transitions.
+bottom_layers = [ 'bottom' ]
+
+# Aliases for the keys on the numeric keypad, to make them easier to write as keysyms.
+key_aliases = {
+    "KP_HOME" : "nonum_K_KP7",
+    "KP_UP" : "nonum_K_KP8",
+    "KP_PAGEUP" : "nonum_K_KP9",
+    "KP_LEFT" : "nonum_K_KP4",
+    "KP_RIGHT" : "nonum_K_KP6",
+    "KP_END" : "nonum_K_KP1",
+    "KP_DOWN" : "nonum_K_KP2",
+    "KP_PAGEDOWN" : "nonum_K_KP3",
+    "KP_INSERT" : "nonum_K_KP0",
+    "KP_DELETE" : "nonum_K_KP_PERIOD",
+    "KP_0" : "num_K_KP0",
+    "KP_1" : "num_K_KP1",
+    "KP_2" : "num_K_KP2",
+    "KP_3" : "num_K_KP3",
+    "KP_4" : "num_K_KP4",
+    "KP_5" : "num_K_KP5",
+    "KP_6" : "num_K_KP6",
+    "KP_7" : "num_K_KP7",
+    "KP_8" : "num_K_KP8",
+    "KP_9" : "num_K_KP9",
+    "KP_PERIOD" : "num_K_KP_PERIOD",
+    "KP_DIVIDE" : "K_KP_DIVIDE",
+    "KP_MULTIPLY" : "K_KP_MULTIPLY",
+    "KP_MINUS" : "K_KP_MINUS",
+    "KP_PLUS" : "K_KP_PLUS",
+    "KP_ENTER" : "K_KP_ENTER",
+    "KP_EQUALS" : "K_KP_EQUALS",
+}
+
 del os
 del collections
 
 
 def init():
-    import renpy
-
     global scene
     scene = renpy.exports.scene
 

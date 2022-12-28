@@ -102,7 +102,7 @@ class Borders(object):
 
     `left`, `top`, `right`, `bottom`
         These provide the size of the insets used by a frame, and are added
-        to the padding on each side. They should zero or a positive integer.
+        to the padding on each side. They should be zero or a positive integer.
 
     `pad_left`, `pad_top`, `pad_right`, `pad_bottom`
         These are added to the padding on each side, and may be positive or
@@ -564,6 +564,10 @@ class Frame(renpy.display.core.Displayable):
         rv.image = image
         rv._duplicatable = image._duplicatable
         return rv
+
+    def _unique(self):
+        self.image._unique()
+        self._duplicatable = False
 
     def _in_current_store(self):
         image = self.image._in_current_store()

@@ -1,4 +1,4 @@
-translate spanish strings:
+﻿translate spanish strings:
 
     # _developer/developer.rpym:38
     old "Developer Menu"
@@ -207,3 +207,15 @@ translate spanish strings:
     # renpy/common/00console.rpy:929
     old "unescape: Disables escaping of unicode symbols in unicode strings and print it as is (default)."
     new "unescape: Desactiva el escape de símbolos Unicode en cadenas Unicode y lo imprime como está (predeterminado)."
+
+    # renpy/common/00console.rpy:784
+    old "stack: print the return stack"
+    new "stack: imprime la pila de retorno"
+    
+    # renpy/common/00console.rpy:781
+    old "help: show this help\n help <expr>: show signature and documentation of <expr>"
+    new "help: muestra esta ayuda\n help <expr>: muestra la firma y la documentación de <expr>"
+
+    # renpy/common/00console.rpy:805
+    old "Help may display undocumented functions. Please check that the function or\nclass you want to use is documented.\n\n"
+    new "La ayuda puede mostrar funciones no documentadas. Por favor, compruebe que la función o\nclase que desea utilizar está documentada.\n\n"

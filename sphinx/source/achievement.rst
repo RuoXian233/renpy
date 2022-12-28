@@ -1,3 +1,5 @@
+.. _achievement:
+
 Achievements
 ============
 
@@ -29,7 +31,14 @@ Variables that control achievements are:
 
     If not None, this should be the Steam appid. Ren'Py will automatically
     set this appid when it starts. This needs to be set using the define
-    statement
+    statement::
 
         define config.steam_appid = 12345
 
+Steamworks API
+--------------
+
+When Steam is available, a ctypes-based binding to the Steamworks API is
+available as ``achievement.steamapi``. The binding is an instance of the
+steamapi module, as found `here <https://github.com/renpy/renpy-build/blob/master/steamapi/steamapi.py>`_,
+and represents a machine translation of the C++ Steamworks API to Python.

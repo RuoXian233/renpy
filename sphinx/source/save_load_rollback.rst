@@ -1,5 +1,3 @@
-.. _save-load-rollback:
-
 =============================
 Saving, Loading, and Rollback
 =============================
@@ -214,17 +212,16 @@ Save Functions and Variables
 ============================
 
 There is one variable that is used by the high-level save system:
+:var:`save_name`.
 
-.. var:: save_name = ...
+This is a string that is stored with each save. It can be used to give
+a name to the save, to help users tell them apart.
 
-   This is a string that is stored with each save. It can be used to give
-   a name to the save, to help users tell them apart.
-
-   More per-save data customization can be done with the Json supplementary
-   data system, see :var:`config.save_json_callbacks`.
+More per-save data customization can be done with the Json supplementary
+data system, see :var:`config.save_json_callbacks`.
 
 There are a number of high-level save actions and functions defined in the
-:ref:`screen actions <screen-actions>`. In addition, there are the following
+:doc:`screen actions <screen_actions>`. In addition, there are the following
 low-level save and load actions.
 
 
@@ -264,6 +261,7 @@ For example::
 
 .. include:: inc/retain_after_load
 
+.. _rollback:
 
 Rollback
 ========

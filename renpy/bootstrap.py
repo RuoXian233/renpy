@@ -29,8 +29,6 @@ import sys
 import subprocess
 import io
 
-import __main__
-
 # Encoding and sys.stderr/stdout handling ######################################
 
 FSENCODING = sys.getfilesystemencoding() or "utf-8"
@@ -44,6 +42,15 @@ if PY2:
     reload(sys) # type: ignore
     sys.setdefaultencoding("utf-8") # type: ignore
     sys.executable = sys_executable
+
+def _setdefaultencoding(name):
+    """
+    This is install in sys to prevent games from trying to change the default
+    encoding.
+    """
+
+sys.setdefaultencoding = _setdefaultencoding # type: ignore
+
 
 sys.stdout = old_stdout
 sys.stderr = old_stderr
@@ -62,13 +69,16 @@ class NullFile(io.IOBase):
     def read(self, length=None):
         raise IOError("Not implemented.")
 
+    def flush(self):
+        return
+
 
 def null_files():
     try:
         if (sys.stderr is None) or sys.stderr.fileno() < 0:
             sys.stderr = NullFile()
 
-        if (sys.stderr is None) or sys.stdout.fileno() < 0:
+        if (sys.stdout is None) or sys.stdout.fileno() < 0:
             sys.stdout = NullFile()
     except Exception:
         pass
@@ -184,7 +194,7 @@ def bootstrap(renpy_base):
         if not os.path.exists(basedir + "/game"):
             os.mkdir(basedir + "/game", 0o777)
 
-    gamedir = __main__.path_to_gamedir(basedir, name)
+    gamedir = renpy.__main__.path_to_gamedir(basedir, name)
 
     sys.path.insert(0, basedir)
 
@@ -293,7 +303,6 @@ You may be using a system install of python. Please run {0}.sh,
 
             except Exception as e:
                 renpy.error.report_exception(e)
-                pass
 
         sys.exit(exit_status)
 
@@ -302,12 +311,12 @@ You may be using a system install of python. Please run {0}.sh,
         if "RENPY_SHUTDOWN_TRACE" in os.environ:
             enable_trace(int(os.environ["RENPY_SHUTDOWN_TRACE"]))
 
-        renpy.display.tts.tts(None)
+        renpy.display.tts.tts(None) # type: ignore
 
-        renpy.display.im.cache.quit()
+        renpy.display.im.cache.quit() # type: ignore
 
-        if renpy.display.draw:
-            renpy.display.draw.quit()
+        if renpy.display.draw: # type: ignore
+            renpy.display.draw.quit() # type: ignore
 
         renpy.audio.audio.quit()
 

@@ -183,7 +183,7 @@ init python:
 
         filename = os.path.join(p.path, ".android.json")
 
-        with open(filename, "rb") as f:
+        with open(filename, "r") as f:
             android_json = json.load(f)
 
         old_android_json = dict(android_json)
@@ -204,7 +204,7 @@ init python:
 
         if android_json != old_android_json:
 
-            with open(filename, "wb") as f:
+            with open(filename, "w") as f:
                 json.dump(android_json, f)
 
 
@@ -283,7 +283,8 @@ init python:
                     pass
 
             if opendir:
-                store.OpenDirectory(dir_to_open)()
+                dir_to_open = os.path.join(p.path, dir_to_open)
+                renpy.run(store.OpenDirectory(dir_to_open, absolute=True))
 
 
         with interface.nolinks():
@@ -627,20 +628,60 @@ label android_clean:
         interface.info(_("Cleaning up Android project."))
 
         # Get the android json file, for the update_always key.
-        filename = os.path.join(project.current.path, ".android.json")
-        with open(filename, "rb") as f:
-            android_json = json.load(f)
+        try:
+            filename = os.path.join(project.current.path, ".android.json")
+            with open(filename, "rb") as f:
+                android_json = json.load(f)
+        except Exception:
+            android_json = {}
 
         # Clean up the files.
         def clean(path):
             if os.path.exists(path):
                 shutil.rmtree(path)
 
-        clean(rapt.plat.path("bin"))
-
         if android_json.get("update_always", True):
+
+            try:
+                with open(rapt.plat.path("project/local.properties"), "r") as f:
+                    local_properties = f.read()
+            except Exception:
+                local_properties = None
+
+            try:
+                with open(rapt.plat.path("project/bundle.properties"), "r") as f:
+                    bundle_properties = f.read()
+            except Exception:
+                bundle_properties = None
+
+            try:
+                with open(rapt.plat.path("project/gradle.properties"), "r") as f:
+                    gradle_properties = f.read()
+            except Exception:
+                gradle_properties = None
+
             clean(rapt.plat.path("project"))
 
+            if local_properties or bundle_properties or gradle_properties:
+
+                os.mkdir(rapt.plat.path("project"))
+
+            if local_properties:
+
+                with open(rapt.plat.path("project/local.properties"), "w") as f:
+                    f.write(local_properties)
+
+            if bundle_properties:
+
+                with open(rapt.plat.path("project/bundle.properties"), "w") as f:
+                    f.write(bundle_properties)
+
+            if gradle_properties:
+
+                with open(rapt.plat.path("project/gradle.properties"), "w") as f:
+                    f.write(gradle_properties)
+
+        clean(rapt.plat.path("bin"))
         clean(project.current.temp_filename("android.dist"))
 
         # This can go really fast, so pause so it looks like something is happening.

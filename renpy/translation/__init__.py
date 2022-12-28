@@ -106,7 +106,7 @@ class ScriptTranslator(object):
         UserStatement = renpy.ast.UserStatement
         Translate = renpy.ast.Translate
 
-        filename = renpy.exports.unelide_filename(nodes[0].filename)
+        filename = renpy.lexer.unelide_filename(nodes[0].filename)
         filename = os.path.normpath(os.path.abspath(filename))
 
         for n in nodes:
@@ -204,7 +204,7 @@ class ScriptTranslator(object):
             tl = self.language_translates.get((identifier, language), None)
 
             if (tl is None) and alternate:
-                tl = self.language_translates.get((identifier, language), None)
+                tl = self.language_translates.get((identifier, alternate), None)
 
         else:
             tl = None
@@ -234,7 +234,17 @@ class Restructurer(object):
         self.label = None
         self.alternate = None
 
+        self.preexisting_identifiers = set()
         self.identifiers = set()
+
+        # Search for identifiers that have been set to the user, and add them
+        # to self.preexisting_identifiers.
+        for i in renpy.script.collapse_stmts(children):
+            if isinstance(i, renpy.ast.Say):
+                identifier = getattr(i, "identifier", None)
+                if identifier is not None:
+                    self.preexisting_identifiers.add(identifier)
+
         self.callback(children)
 
     def id_exists(self, identifier):
@@ -260,7 +270,7 @@ class Restructurer(object):
 
             identifier = base + suffix
 
-            if not self.id_exists(identifier):
+            if not self.id_exists(identifier) and not (identifier in self.preexisting_identifiers):
                 break
 
             i += 1
@@ -300,7 +310,6 @@ class Restructurer(object):
 
         else:
             alternate = None
-            identifier = identifier
 
         self.identifiers.add(identifier)
         if alternate is not None:
@@ -478,7 +487,7 @@ def add_string_translation(language, old, new, newloc):
 Default = renpy.object.Sentinel("default")
 
 
-def translate_string(s, language=Default):
+def translate_string(s, language=Default): # type (str, str|renpy.object.Sentinel|None) -> str
     """
     :doc: translate_string
     :name: renpy.translate_string
@@ -703,13 +712,29 @@ def check_language():
     if ctx.translate_language != preferences.language:
         ctx.translate_language = preferences.language
 
-        tid = ctx.translate_identifier
+        tid = ctx.translate_identifier or ctx.deferred_translate_identifier
 
         if tid is not None:
             node = renpy.game.script.translator.lookup_translate(tid) # @UndefinedVariable
 
             if node is not None:
+                # This is necessary for the menu-with-say case. ADVCharachter needs
+                # identifier to set deferred_translate_identifier again, but EndTranslation
+                # has already set translate_identifier to None.
+                ctx.translate_identifier = tid
+
                 raise renpy.game.JumpException(node.name)
+
+
+def get_translation_identifier():
+    """
+    :doc: translation_functions
+
+    Returns the translation identifier for the current statement.
+    """
+
+    ctx = renpy.game.contexts[-1]
+    return ctx.translate_identifier or ctx.deferred_translate_identifier
 
 
 def known_languages():
@@ -926,7 +951,7 @@ def detect_user_locale():
         if isinstance(locale_name, bytes):
             locale_name = locale_name.decode("utf-8")
 
-        local_name = locale_name.replace("-", "_")
+        locale_name = locale_name.replace("-", "_")
     else:
         locale_name = locale.getdefaultlocale()
         if locale_name is not None:

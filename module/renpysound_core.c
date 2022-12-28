@@ -278,8 +278,16 @@ static void start_sample(struct Channel* c, int reset_fade) {
             c->fade_vol = 0;
 
             if (fade_steps) {
-                c->fade_step_len = ms_to_bytes(c->playing_fadein) / fade_steps;
-                c->fade_step_len &= ~0x7; // Even sample.
+                while (c->fade_delta < c->volume) {
+                    c->fade_step_len = c->fade_delta * ms_to_bytes(c->playing_fadein) / fade_steps;
+                    c->fade_step_len &= ~0x7; // Even sample.
+
+                    if (c->fade_step_len != 0) {
+                        break;
+                    }
+
+                    c->fade_delta *= 2;
+                }
             } else {
                 c->fade_step_len = 0;
             }
@@ -859,13 +867,21 @@ void RPS_fadeout(int channel, int ms) {
     c->fade_vol = c->volume;
 
     if (fade_steps) {
-        c->fade_step_len = ms_to_bytes(ms) / fade_steps;
-        c->fade_step_len &= ~0x7; // Even sample.
+        while (-c->fade_delta < c->volume) {
+            c->fade_step_len = -c->fade_delta * ms_to_bytes(ms) / fade_steps;
+            c->fade_step_len &= ~0x7; // Even sample.
+
+            if (c->fade_step_len != 0) {
+                break;
+            }
+
+            c->fade_delta *= 2;
+        }
     } else {
         c->fade_step_len = 0;
     }
 
-    c->stop_bytes = ms_to_bytes(ms);
+    c->stop_bytes = c->fade_step_len * c->volume / -c->fade_delta;
     c->queued_tight = 0;
 
     if (!c->queued) {
@@ -1017,23 +1033,41 @@ void RPS_set_volume(int channel, float volume) {
 
     c->volume = new_volume;
 
-    if (c->fade_step_len) {
+    if (old_volume == 0) {
+        c->fade_step_len = 0;
+    } else if (new_volume == 0) {
+        c->fade_step_len = 0;
+    } else if (c->fade_step_len) {
 
         if (c->fade_delta > 0) {
             int fade_samples_remaining = c->fade_step_len * (old_volume - c->fade_vol);
             c->fade_vol = new_volume * c->fade_vol / old_volume;
-            c->fade_step_len = fade_samples_remaining / (new_volume - c->fade_vol);
-            c->fade_step_len &= ~0x7; // Even sample.
-            c->fade_delta = 1;
+
+            if (new_volume <= c->fade_vol) {
+                c->fade_step_len = 0;
+            } else {
+                c->fade_step_len = fade_samples_remaining / (new_volume - c->fade_vol);
+                c->fade_step_len &= ~0x7; // Even sample.
+                c->fade_delta = 1;
+            }
         }
 
         if (c->fade_delta < 0) {
             int fade_samples_remaining = c->fade_step_len * c->fade_vol;
             c->fade_vol = new_volume * c->fade_vol / old_volume;
-            c->fade_step_len = fade_samples_remaining /  c->fade_vol;
-            c->fade_step_len &= ~0x7; // Even sample.
-            c->fade_delta = -1;
+
+            if (c->fade_vol <= 0) {
+                c->fade_step_len = 0;
+            } else {
+                c->fade_step_len = fade_samples_remaining /  c->fade_vol;
+                c->fade_step_len &= ~0x7; // Even sample.
+                c->fade_delta = -1;
+            }
         }
+    }
+
+    if (c->fade_step_len == 0) {
+        c->fade_vol = new_volume;
     }
 
     error(SUCCESS);
@@ -1119,7 +1153,9 @@ PyObject *RPS_read_video(int channel) {
     c = &channels[channel];
 
     if (c->playing) {
+        Py_BEGIN_ALLOW_THREADS
         surf = media_read_video(c->playing);
+        Py_END_ALLOW_THREADS
     }
 
     error(SUCCESS);

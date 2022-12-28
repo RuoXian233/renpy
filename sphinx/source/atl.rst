@@ -26,7 +26,7 @@ The ``transform`` statement creates a transform that can be supplied as part of 
 at clause. The syntax of the transform statement is:
 
 .. productionlist:: script
-    atl_transform : "transform" `name` "(" `parameters` ")" ":"
+    atl_transform : "transform" `qualname` ( "(" `parameters` ")" )? ":"
                   :    `atl_block`
 
 The transform statement  must be run at init time. If it is found outside an
@@ -35,13 +35,17 @@ priority of 0. The transform may have a list of parameters, which must be
 supplied when it is called. Default values for the right-most parameters can
 be given by adding "=" and the value (e.g. "transform a (b, c=0):").
 
-`Name` must be a Python identifier. The transform created by the ATL block is
-bound to this name.::
+`qualname` must be a set of dot-separated Python identifiers. The transform created
+by the ATL block is bound to this name, within the given
+:ref:`store <named-stores>` if one was provided.::
 
-   transform left_to_right:
-       xalign 0.0
-       linear 2.0 xalign 1.0
-       repeat
+    transform left_to_right:
+        xalign 0.0
+        linear 2.0 xalign 1.0
+        repeat
+
+    transform ariana.left:
+        xcenter .3
 
 .. _atl-image-statement:
 
@@ -140,9 +144,27 @@ The interpolation statement is the main way that ATL controls transformations.
 The first part of the interpolation statement is used to select a function
 that time-warps the interpolation. (That is, a function from linear time to
 non-linear time.) This can either be done by giving the name of a warper
-registered with ATL, or by giving the keyword "warp" followed by an
+registered with ATL, or by giving the
+keyword "warp" followed by an
 expression giving a function. Either case is followed by a number, giving the
-number of seconds the interpolation should take.
+number of seconds the interpolation should take. ::
+
+    transform builtin_warper:
+        xpos 0
+        ease 5 xpos 520
+
+    init python:
+        def my_warper(t):
+            return t**4.4
+
+    define my_warpers = [my_warper]
+
+    transform accessed_as_function:
+        xpos 0
+        warp my_warpers[0] 5 xpos 520
+        warp my_warper 3 xpos 100
+
+See :ref:`warpers` for more information about warpers.
 
 If no warp function is given, the interpolation is instantaneous. Otherwise,
 it persists for the amount of time given, and at least one frame.
@@ -939,19 +961,21 @@ both horizontal and vertical positions.
 
 .. transform-property:: corner1
 
-    :type: None or (int, int)
+    :type: None or (position, position)
     :default: None
 
     If not None, gives the upper-left corner of the crop box. Crop takes
-    priority over corners.
+    priority over corners. When a float, and crop_relative is enabled,
+    this is relative to the size of the child.
 
 .. transform-property:: corner2
 
-    :type: None or (int, int)
+    :type: None or (position, position)
     :default: None
 
     If not None, gives the lower right corner of the crop box. Cropt takes
-    priority over corners.
+    priority over corners. When a float, and crop_relativer is enabled, this
+    is relative to the size of the child.
 
 .. transform-property:: xysize
 
@@ -999,26 +1023,26 @@ both horizontal and vertical positions.
 
     If fit, xsize, and ysize are all None, this property does not apply.
 
-   .. list-table::
-      :widths: 15 85
-      :header-rows: 1
+    .. list-table::
+       :widths: 15 85
+       :header-rows: 1
 
-      * - Value
-        - Description
-      * - ``contain``
-        - As large as possible, without exceeding any dimensions.
-          Maintains aspect ratio.
-      * - ``cover``
-        - As small as possible, while matching or exceeding all
-          dimensions. Maintains aspect ratio.
-      * - None or ``fill``
-        - Stretches/squashes displayable to exactly match dimensions.
-      * - ``scale-down``
-        - As for ``contain``, but will never increase the size of the
-          displayable.
-      * - ``scale-up``
-        - As for ``cover``, but will never decrease the size of the
-          displayable.
+       * - Value
+         - Description
+       * - ``contain``
+         - As large as possible, without exceeding any dimensions.
+           Maintains aspect ratio.
+       * - ``cover``
+         - As small as possible, while matching or exceeding all
+           dimensions. Maintains aspect ratio.
+       * - None or ``fill``
+         - Stretches/squashes displayable to exactly match dimensions.
+       * - ``scale-down``
+         - As for ``contain``, but will never increase the size of the
+           displayable.
+       * - ``scale-up``
+         - As for ``cover``, but will never decrease the size of the
+           displayable.
 
 .. transform-property:: subpixel
 
@@ -1095,11 +1119,9 @@ both horizontal and vertical positions.
     :default: None
 
     If not None, the value of this property is used to recolor everything
-    that children of this transform draw. See :ref:`matrixcolor` for more
-    information.
-
-    This requires model-based rendering to be enabled by setting :var:`config.gl2` to
-    True.
+    that children of this transform draw. Interpolation is only supported
+    when MatrixColors are used, and the MatrixColors are structurally similar.
+    See :doc:`matrixcolor` for more information.
 
 .. transform-property:: blur
 
@@ -1111,8 +1133,18 @@ both horizontal and vertical positions.
     between Ren'Py versions, and the blurring may exhibit artifacts,
     especially when the image being blurred is changing.
 
-    This requires model-based rendering to be enabled by setting :var:`config.gl2` to
-    True.
+
+.. transform-property:: show_cancels_hide
+
+    :type: boolean
+    :default: True
+
+
+    Normally, when a displayable or screen with the same tag or name as one
+    that is hiding is shown, the hiding displayable or screen is removed,
+    cancelling the hide transform. If this0 property is False in the hide
+    transform, this cancellation will not occur, and the hide transform
+    will proceed to completion.
 
 There are also several sets of transform properties that are documented elsewhere:
 
@@ -1145,6 +1177,7 @@ These properties are applied in the following order:
 #. matrixcolor
 #. GL Properties, Uniforms
 #. position properties
+#. show_cancels_hide
 
 Deprecated Transform Properties
 ===============================
@@ -1298,7 +1331,7 @@ Finally, when a ``show`` statement does not include an ``at`` clause, the
 same displayables are used, so no inheritence is necessary. To prevent inheritance,
 show and then hide the displayable.
 
-.. _atl-transititions:
+.. _atl-transitions:
 
 ATL Transitions
 ===============
@@ -1343,8 +1376,8 @@ contexts, if the parameter is in the parameter list.
 `child`
     When ATL is used as a transform, the child parameter is given the original
     child that the transform is applied to. This allows the child to be referred
-    to explicitly. For example, it becomes possible to swap between the s
-    supplied child and another displayable::
+    to explicitly. For example, it becomes possible to swap between the supplied
+    child and another displayable::
 
         transform lucy_jump_scare(child):
             child      # Show the original child.

@@ -288,8 +288,10 @@ cdef class GL2Draw:
             renpy.display.log.write("GL Disabled.")
             return False
 
-        if renpy.mobile or renpy.game.preferences.physical_size is None: # @UndefinedVariable
+        if renpy.mobile:
             physical_size = (None, None)
+        elif renpy.game.preferences.physical_size is None:
+            physical_size = (renpy.config.physical_width, renpy.config.physical_height)
         else:
             physical_size = renpy.game.preferences.physical_size
 
@@ -345,6 +347,9 @@ cdef class GL2Draw:
 
             if renpy.config.gl_resize:
                 window_flags |= pygame.RESIZABLE
+
+        if renpy.config.gl2_modify_window_flags is not None:
+            window_flags = renpy.config.gl2_modify_window_flags(window_flags)
 
         # Select the GL attributes and hints.
         self.select_gl_attributes(gles)
@@ -429,8 +434,8 @@ cdef class GL2Draw:
             self.quit_fbo()
             self.shader_cache.clear()
 
-        if renpy.android or renpy.ios:
-            pygame.display.get_window().recreate_gl_context()
+        if renpy.android or renpy.ios or renpy.emscripten:
+            pygame.display.get_window().recreate_gl_context(always=renpy.emscripten)
 
         # Are we in fullscreen mode?
         fullscreen = bool(pygame.display.get_window().get_window_flags() & (pygame.WINDOW_FULLSCREEN_DESKTOP | pygame.WINDOW_FULLSCREEN))
@@ -548,8 +553,9 @@ cdef class GL2Draw:
         fullscreen = bool(pygame.display.get_window().get_window_flags() & (pygame.WINDOW_FULLSCREEN_DESKTOP | pygame.WINDOW_FULLSCREEN))
 
         size = renpy.display.core.get_size()
+        drawable_size = pygame.display.get_drawable_size()
 
-        if force or (fullscreen != renpy.display.interface.fullscreen) or (size != self.physical_size):
+        if force or (fullscreen != renpy.display.interface.fullscreen) or (size != self.physical_size) or (drawable_size != self.drawable_size):
             renpy.display.interface.before_resize()
             self.on_resize()
 
@@ -627,6 +633,9 @@ cdef class GL2Draw:
         width = min(width, max_texture_size, max_renderbuffer_size)
         height = max(self.virtual_size[1] + BORDER, self.drawable_size[1] + BORDER, height)
         height = min(height, max_texture_size, max_renderbuffer_size)
+
+        if "RENPY_MAX_TEXTURE_SIZE" in os.environ:
+            width = height = int(os.environ["RENPY_MAX_TEXTURE_SIZE"])
 
         renpy.display.log.write("Maximum texture size: %dx%d", width, height)
 

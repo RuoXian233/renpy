@@ -93,6 +93,7 @@ class StoreModule(object):
     def __delattr__(self, key):
         del self.__dict__[key]
 
+
 # Used to unpickle a store module.
 
 
@@ -136,6 +137,9 @@ class StoreDict(dict):
         Called to mark the start of a rollback period.
         """
 
+        if self.get("_constant", False):
+            return
+
         self.old = DictItems(self)
 
     def get_changes(self, cycle):
@@ -151,6 +155,9 @@ class StoreDict(dict):
             If true, this cycles the old changes to the new changes. If
             False, does not.
         """
+
+        if self.get("_constant", False):
+            return
 
         new = DictItems(self)
         rv = find_changes(self.old, new, deleted)
@@ -218,14 +225,13 @@ def create_store(name):
     pyname = pystr(name)
 
     # Set the name.
-    d["__name__"] = pyname
-    d["__package__"] = pyname
+    d.update(__name__=pyname, __package__=pyname)
 
     # Set up the default contents of the store.
     eval("1", d)
 
     for k, v in renpy.minstore.__dict__.items():
-        if k not in d:
+        if (k not in d) and k != "__all__":
             d[k] = v
 
     # Create or reuse the corresponding module.
@@ -255,8 +261,9 @@ class StoreBackup():
         # The contents of ever_been_changed for each store.
         self.ever_been_changed = { }
 
-        for k in store_dicts:
-            self.backup_one(k)
+        for k, v in store_dicts.items():
+            if not v.get("_constant", False):
+                self.backup_one(k)
 
     def backup_one(self, name):
 
@@ -279,7 +286,7 @@ class StoreBackup():
 
     def restore(self):
 
-        for k in store_dicts:
+        for k in self.store:
             self.restore_one(k)
 
 
@@ -348,6 +355,15 @@ class LoadedVariables(ast.NodeVisitor):
             self.loaded.add(node.id)
         elif isinstance(node.ctx, ast.Store):
             self.stored.add(node.id)
+        elif PY2 and isinstance(node.ctx, ast.Param):
+            # there's no guarantee that ast.Param will keep existing in future versions of python3
+            # it's only present in asts made in py2
+            self.stored.add(node.id)
+
+    if not PY2:
+        # we could remove this if, but the method wouldn't be called in py2 anyway
+        def visit_arg(self, node):
+            self.stored.add(node.arg)
 
     def find(self, node):
         self.loaded = set()
@@ -752,6 +768,9 @@ new_compile_flags = (old_compile_flags
 py3_compile_flags = (new_compile_flags |
                       __future__.division.compiler_flag)
 
+if not PY2:
+    py3_compile_flags |= __future__.annotations.compiler_flag
+
 # The set of files that should be compiled under Python 2 with Python 3
 # semantics.
 py3_files = set()
@@ -763,20 +782,32 @@ py_compile_cache = { }
 old_py_compile_cache = { }
 
 
-# Duplicated from ast.py to prevent a gc cycle.
-def fix_missing_locations(node, lineno, col_offset):
-    if 'lineno' in node._attributes:
-        if not hasattr(node, 'lineno'):
-            node.lineno = lineno
-        else:
-            lineno = node.lineno
-    if 'col_offset' in node._attributes:
-        if not hasattr(node, 'col_offset'):
-            node.col_offset = col_offset
-        else:
-            col_offset = node.col_offset
+def fix_locations(node, lineno, col_offset):
+    """
+    Assigns locations to the given node, and all of its children, adding
+    any missing line numbers and column offsets.
+    """
+
+    start = max(
+        (lineno, col_offset),
+        (getattr(node, "lineno", None) or 1, getattr(node, "col_offset", None) or 0)
+    )
+
+    lineno, col_offset = start
+
+    node.lineno = lineno
+    node.col_offset = col_offset
+
+    ends = [ start, (getattr(node, "end_lineno", None) or 1, getattr(node, "end_col_offset", None) or 0) ]
+
     for child in ast.iter_child_nodes(node):
-        fix_missing_locations(child, lineno, col_offset)
+        fix_locations(child, lineno, col_offset)
+        ends.append((child.end_lineno, child.end_col_offset))
+
+    end = max(ends)
+
+    node.end_lineno = end[0]
+    node.end_col_offset = end[1]
 
 
 def quote_eval(s):
@@ -962,7 +993,7 @@ def py_compile(source, mode, filename='<none>', lineno=1, ast_node=False, cache=
                 try:
                     fixed_source = renpy.compat.fixes.fix_tokens(source)
                     tree = compile(fixed_source, filename, py_mode, ast.PyCF_ONLY_AST | flags, 1)
-                except:
+                except Exception:
                     raise orig_e
 
         else:
@@ -980,7 +1011,7 @@ def py_compile(source, mode, filename='<none>', lineno=1, ast_node=False, cache=
         if mode == "hide":
             wrap_hide(tree)
 
-        fix_missing_locations(tree, 1, 0)
+        fix_locations(tree, 1, 0)
         ast.increment_lineno(tree, lineno - 1)
 
         line_offset = 0
@@ -988,7 +1019,16 @@ def py_compile(source, mode, filename='<none>', lineno=1, ast_node=False, cache=
         if ast_node:
             return tree.body
 
-        rv = compile(tree, filename, py_mode, flags, 1)
+        try:
+            rv = compile(tree, filename, py_mode, flags, 1)
+        except SyntaxError as orig_e:
+            try:
+                tree = renpy.compat.fixes.fix_ast(tree)
+                fix_locations(tree, 1, 0)
+                rv = compile(tree, filename, py_mode, flags, 1)
+            except Exception:
+                raise orig_e
+
 
         if cache:
             py_compile_cache[key] = rv
@@ -998,6 +1038,12 @@ def py_compile(source, mode, filename='<none>', lineno=1, ast_node=False, cache=
         return rv
 
     except SyntaxError as e:
+
+        try:
+            # e.text = # renpy.lexer.get_line_text(e.filename, e.lineno)
+            e.text = source.splitlines()[e.lineno - 1]
+        except Exception:
+            pass
 
         if e.lineno is not None:
             e.lineno += line_offset
@@ -1109,6 +1155,9 @@ class StoreProxy(object):
     def __delattr__(self, k):
         delattr(renpy.store, k) # @UndefinedVariable
 
+# This needs to exist even after PY2 support is dropped, to load older saves.
+def method_unpickle(obj, name):
+    return getattr(obj, name)
 
 if PY2:
 
@@ -1122,9 +1171,6 @@ if PY2:
             obj = method.im_class
 
         return method_unpickle, (obj, name)
-
-    def method_unpickle(obj, name):
-        return getattr(obj, name)
 
     copyreg.pickle(types.MethodType, method_pickle)
 

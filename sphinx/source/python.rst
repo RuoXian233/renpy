@@ -17,7 +17,7 @@ Ren'Py 7 supports Python 2.7. Ren'Py 8 supports Python 3.9.
     Python packages that don't ship with Ren'Py may not work inside Ren'Py.
 
     There are also some Python constructs that work, but may lead to problems
-    in saving. Please read the :ref:`save, load, and rollback <save-load-rollback>` page
+    in saving. Please read the :doc:`save, load, and rollback <save_load_rollback>` page
     for more details, especially the section on :ref:`what can't be saved <cant-save>`.
     (You need to be careful with files, sockets, iterators, task, futures, and
     generators.)
@@ -118,7 +118,7 @@ persistent data. ::
 A priority number can be placed between ``init`` and ``python``. When
 a priority is not given, 0 is used. Init statements are run in priority
 order, from lowest to highest. Init statements of the same priority are run in
-Unicode order by filename, and then from top to bottom within a file.
+Unicode order by filepath, and then from top to bottom within a file.
 
 To avoid conflict with Ren'Py, creators should use priorities in the
 range -999 to 999. Priorities of less than 0 are generally used for
@@ -151,7 +151,7 @@ For example::
 
     define e = Character("Eileen")
 
-is equivalent to::
+is equivalent (except for some advantages, see below) to::
 
     init python:
         e = Character("Eileen")
@@ -177,11 +177,15 @@ or operator is generally used to concatenate sets. For example::
 One advantage of using the define statement is that it records the
 filename and line number at which the assignment occurred, and
 makes that available to the navigation feature of the launcher.
+Another advantage is that :ref:`lint` will be able to check defined
+values, for example by detecting whether the same variable is defined
+twice, potentially with different values.
 
 Variables that are defined using the define statement are treated
-as constant, are not saved or loaded, and should not be changed.
-(Ren'Py does not enforce this, but will produce undefined behavior
-when this is not the case.)
+as constant, are not saved or loaded, and should not be changed. This
+constant-nature extends to objects reachable through these variables
+through field access and subscripting. (Ren'Py does not enforce this,
+but will produce undefined behavior when this is not the case.)
 
 .. _default-statement:
 
@@ -211,33 +215,8 @@ if it doesn't already exist. For example::
 
     default schedule.day = 0
 
-
-.. _init-offset-statement:
-
-Init Offset Statement
----------------------
-
-The ``init offset`` statement sets a priority offset for all statements
-that run at init time (init, init python, define, default, screen,
-transform, style, and more). The offset applies to all following
-statements in the current block and child blocks, up to the next
-init priority statement. The statement::
-
-    init offset = 42
-
-sets the priority offset to 42. In::
-
-    init offset = 2
-    define foo = 2
-
-    init offset = 1
-    define foo = 1
-
-    init offset = 0
-
-The first define statement is run at priority 2, which means it runs
-after the second define statement, and hence ``foo`` winds up with
-a value of 2.
+As for the ``define`` statement, :ref:`lint` offers checks and optimizations
+related to the ``default`` statement.
 
 Names in the Store
 ------------------
@@ -268,23 +247,28 @@ character and a flag. Other things that are usually placed into
 the store are transitions and transforms.
 
 Names beginning with underscore ``_`` are reserved for Ren'Py's
-internal use. In addition, there is an :ref:`Index of Reserved Names <reserved-names>`.
+internal use. In addition, there is an :doc:`Index of Reserved Names <reserved>`.
 
+.. _named-stores:
 
 Other Named Stores
 ------------------
 
 Named stores provide a way of organizing Python functions and variables
-into modules. By placing Python in modules, you can minimize the chance of name
-conflicts.
+into modules. By placing Python in named stores, you can minimize the
+chance of name conflicts. Each store corresponds to a Python module.
+The default store is ``store``, while a named store is accessed as
+``store.named``.
+
+Named stores can be created using ``python in`` blocks (or their
+``init python`` or ``python early`` variants), or using ``default``,
+``define`` or :ref:`transform <transform-statement>` statements. Variables
+in can be imported individually using ``from store.named import variable``,
+and a named store itself can be imported using ``from store import named``.
 
 Named stores can be accessed by supplying the ``in`` clause to
-``python`` or ``init python``, all of which run Python in a named
-store. Each store corresponds to a Python module. The default store is
-``store``, while a named store is accessed as ``store.name``. Names in
-the modules can be imported using the Python ``from`` statement.
-Named stores can be created using ``init python in`` blocks, or using
-default or define statements.
+``python`` or ``init python`` (or ``python early``), all of which
+run the Python they contain in the given named store.
 
 For example::
 
@@ -306,13 +290,59 @@ For example::
         if "Lucy" in character_stats.chloe_substore.friends:
             chloe "Lucy is my friend !"
         elif character_stats.chloe_substore.friends:
-            chelo "I have friends, but Lucy is not one of them."
+            chloe "I have friends, but Lucy is not one of them."
 
+        python in character_stats.chloe_substore:
+            friends.add("Jeremy")
+
+
+From a ``python in`` block, the default "outer" store can be
+accessed using either ``renpy.store``, or ``import store``.
 
 Named stores participate in save, load, and rollback in the same way
 that the default store does. Special namespaces such as ``persistent``,
 ``config``, ``renpy``... do not and never have supported substore creation
 within them.
+
+
+.. _constant-stores:
+
+Constant Stores
+---------------
+
+A named store can be declared to be constant by setting a variable named ``_constant``
+to a true value, using, for example::
+
+    init python in mystore:
+        _constant = True
+
+When a store is constant, variables in that store are not saved, and objects
+reachable solely from those variables do not participate in rollback.
+
+Variables in a constant store can be changed during the init phase. It's only
+after init (including statements like ``define``, ``transform``, etc.) completes
+that the store must be treated as constant.
+
+As Ren'Py has no way of enforcing this, it is the responsibility of the creator
+to ensure that variables in a constant store do not change after the init phase.
+
+The reason for declaring a store constant is that each store and variable
+incurs a small amount of overhead to support saving, loading, and rollback.
+A constant store avoids this overhead.
+
+The following stores are declared constant by default::
+
+    _errorhandling
+    _gamepad
+    _renpysteam
+    _warper
+    audio
+    achievement
+    build
+    director
+    iap
+    layeredimage
+    updater
 
 
 .. _python-modules:

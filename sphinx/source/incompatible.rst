@@ -13,11 +13,104 @@ Incompatible changes to the GUI are documented at :ref:`gui-changes`, as
 such changes only take effect when the GUI is regenerated.
 
 
+.. _incompatible-8.1.0:
+.. _incompatible-7.6.0:
+
+8.1.0 / 7.6.0
+-------------
+
+**Lenticular bracket ruby text** This release of Ren'Py introduces
+lenticular bracket ruby text, an easier way of writing ruby text. If
+a game included a literal 【, it needs to be doubled, to "【【", to
+quote it properly. (This is only strictly necessary when the text
+is succeded by a full-width vertical bar, but works always.)
+
+To disable lenticular bracket ruby text, add to your game::
+
+    define config.lenticular_bracket_ruby = False
+
+**Constant stores.** This release of Ren'Py introduces :ref:`constant stores <constant-stores>`, and
+makes some of the built-in stores constant. Constant stores should not change
+outside of the init phase. The following stores are constant:
+
+    _errorhandling
+    _gamepad
+    _renpysteam
+    _warper
+    audio
+    achievement
+    build
+    director
+    iap
+    layeredimage
+    updater
+
+If your game changes a variable in one of these stores, outside of the init,
+the store can be set to non-constant with (for example)::
+
+    define audio._constant = False
+
+**Mixer volumes** now must be specified using a new format, where 0.0 is -60 dB (power)
+and 1.0 is 0 dB (power). To use the old format, where the samples were multiplied
+by volume ** 2, use::
+
+    define config.quadratic_volume = True
+
+Alternatively, you can determine new default volumes for :var:`config.default_music_volume`,
+:var:`config.default_sfx_volume`, and :var:`config.default_voice_volume` variables. If any
+of these is 0.0 or 1.0, it can be left unchanged.
+
+
+.. _incompatible-8.0.2:
+.. _incompatible-7.5.2:
+
+8.0.2 / 7.5.2
+-------------
+
+A modal screen now blocks the ``pause`` statement and :func:`renpy.pause``
+function from timing out. This was the indended behavior, but didn't work
+in some cases. This change can be reverted with::
+
+    define config.modal_blocks_pause = False
+
+The default games no longer filter Ruby/Furigana text tags from the history.
+This requires the line in screens.rpy that sets :var:`gui.history_allow_tags`
+to be changed to::
+
+    define gui.history_allow_tags = { "alt", "noalt", "rt", "rb", "art" }
+
+This change is only required if your game uses Ruby/Furigana text tags.
+
+
 .. _incompatible-8.0.0:
 .. _incompatible-7.5.0:
 
-7.5.0/8.0.0
------------
+8.0.0 / 7.5.0
+-------------
+
+The "Windows, Mac, and Linux for Markets" distribution has been changed to
+no longer prefix the contents of the zip file created with the directory
+name and version number. If you'd like to retain the old behavior, add
+to your game::
+
+    init python:
+        build.package("market", "zip", "windows linux mac renpy all", "Windows, Mac, Linux for Markets")
+
+For the noalt text tag to work with history, you'll need to edit
+screens.rpy to make sure that :var:`gui.history_allow_tags` contains
+"noalt". The defaultfor this variable is::
+
+    define gui.history_allow_tags = { "alt", "noalt" }
+
+(This change was necessary in 7.4, but only documented now.)
+
+The behavior of Ren'Py changed sometime in the 7.4 series, such that
+rollback through a load behaved correctly, and reverted the changes
+performed in the ``after_load`` label, and by :var:`config.after_load_callbacks`.
+(The previous behavior was undefined, with some changes reverted and some not,
+leaving the game in an inconsistent state.) If your game has to migrate
+data after a load, it's now recommended to call :func:`renpy.block_rollback`
+to prevent the changes from being rolled back.
 
 The :var:`config.narrator_menu` variable now defaults to True. It's been
 set to true in the default screens.rpy for some time. In the unlikely event
@@ -38,10 +131,11 @@ or for all screens with::
 
     define config.call_screen_roll_forward = True
 
-Showif statements no longer take up space inside a vbox or hbox when the
-condition is false and the child is hidden. To revert this change::
+Key and timer statements no longer take up space inside a vbox or hbox, and
+the showif statement does not take up space when its child is hidden. To revert
+this change::
 
-    define config.box_skip_false_showif = False
+    define config.box_skip = False
 
 The :propref:`focus_mask` style property now defaults to None for drag displayables.
 This improves performance, but means that the displayable can be dragged by
@@ -71,6 +165,8 @@ an absolute number of pixels, use::
 
 However, be warned that like most things documented only on this page, this will
 conflict with - and cannot be used at the same time as - some other new features.
+This setting applies to :tpref:`crop`, and also now to :tpref:`corner1` and
+:tpref:`corner2`.
 
 The platform-specific directories inside lib/ have had name changes. The
 ``lib/windows-x86_64`` directory is now ``lib/py2-windows-x86_64``. This
@@ -82,7 +178,7 @@ Vpgrids cannot be overfull anymore, and can only be underfull if the
 ``allow_underfull`` property is passed, or if :var:`config.allow_underfull_grids` is
 set to True.
 
-The way :ref:`layered images <layered-images>` place their children, and how children
+The way :doc:`layered images <layeredimage>` place their children, and how children
 with variable size are sized, has changed. Instead of taking into account the available
 area in the context the layeredimage is displayed, it now presumes the size of the
 screen is available, unless an explicit size has been given with :tpref:`xsize`,
@@ -93,6 +189,12 @@ can display differently in different contexts, you can use::
 
 Or you can also toggle it for specific layeredimages by passing them the
 ``offer_screen`` property.
+
+The ``function`` statement in ATL will only block catch-up in cases where it
+executes more than once. To revert to the old behavior, where ATL would block
+at a function, use::
+
+    define config.atl_function_always_blocks = True
 
 
 .. _incompatible-7.4.11:

@@ -22,7 +22,7 @@
 # This module handles the logging of messages to a file.
 
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
-from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # *
+from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode # type: ignore
 
 
 
@@ -100,8 +100,11 @@ class LogFile(object):
         if not renpy.config.log_enable:
             return False
 
+        if renpy.config.logdir is None:
+            return
+
         try:
-            base = os.environ.get("RENPY_LOG_BASE", renpy.config.logdir or renpy.config.basedir)
+            base = os.environ.get("RENPY_LOG_BASE", renpy.config.logdir)
 
             if base is None:
                 return False
@@ -171,7 +174,10 @@ class LogFile(object):
             self.file.write(s) # type: ignore
 
             if self.flush:
-                self.file.flush() # type: ignore
+                try:
+                    self.file.flush() # type: ignore
+                except Exception:
+                    self.flush = False
 
     def exception(self):
         """
@@ -271,8 +277,10 @@ class StdioRedirector(object):
             self.write(i)
 
     def flush(self):
-        self.real_file.flush()
-        pass
+        try:
+            self.real_file.flush()
+        except Exception:
+            pass
 
     def close(self):
         pass

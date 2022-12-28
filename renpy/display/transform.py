@@ -642,6 +642,12 @@ class Transform(Container):
 
     def _hide(self, st, at, kind):
 
+        if kind == "cancel":
+            if self.state.show_cancels_hide:
+                return None
+            else:
+                return self
+
         # Prevent time from ticking backwards, as can happen if we replace a
         # transform but keep its state.
         if st + self.st_offset <= self.st:
@@ -701,10 +707,9 @@ class Transform(Container):
 
         if duplicate and child._duplicatable:
             child = child._duplicate(self._args)
-            child._unique()
 
-        if child._duplicatable:
-            self._duplicatable = True
+            if not self._duplicatable:
+                child._unique()
 
         self.child = child
         self.children = [ child ]
@@ -798,9 +803,11 @@ class Transform(Container):
         return rv
 
     def _unique(self):
-        if self.child and self.child._duplicatable:
-            self._duplicatable = True
-        else:
+        if self._duplicatable:
+
+            if self.child is not None:
+                self.child._unique()
+
             self._duplicatable = False
 
     def get_placement(self):
@@ -884,7 +891,6 @@ class Transform(Container):
 
         rv = self(_args=args)
         rv.take_execution_state(self)
-        rv._unique()
 
         return rv
 
@@ -1001,8 +1007,8 @@ add_property("additive", float, 0.0)
 add_property("alpha", float, 1.0)
 add_property("blend", any_object, None)
 add_property("blur", float_or_none, None)
-add_property("corner1", (float, float), None)
-add_property("corner2", (float, float), None)
+add_property("corner1", (position, position), None)
+add_property("corner2", (position, position), None)
 add_property("crop", (position, position, position, position), None)
 add_property("crop_relative", bool_or_none, None)
 add_property("debug", any_object, None)
@@ -1020,6 +1026,7 @@ add_property("perspective", any_object, None)
 add_property("rotate", float, None)
 add_property("rotate_pad", bool, True)
 add_property("shader", any_object, None, diff=None)
+add_property("show_cancels_hide", bool, True)
 add_property("subpixel", bool, False)
 add_property("transform_anchor", bool, False)
 add_property("zoom", float, 1.0)
@@ -1051,6 +1058,7 @@ add_gl_property("gl_anisotropic")
 add_gl_property("gl_blend_func")
 add_gl_property("gl_color_mask")
 add_gl_property("gl_depth")
+add_gl_property("gl_drawable_resolution")
 add_gl_property("gl_mipmap")
 add_gl_property("gl_pixel_perfect")
 add_gl_property("gl_texture_scaling")

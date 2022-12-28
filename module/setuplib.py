@@ -53,6 +53,9 @@ gen = "gen"
 
 if sys.version_info.major > 2:
     gen += "3"
+    PY2 = False
+else:
+    PY2 = True
 
 if coverage:
     gen += "-coverage"
@@ -444,7 +447,7 @@ def copyfile(source, dest, replace=None, replace_with=None):
     with open(sfn, "r") as sf:
         data = sf.read()
 
-    if replace:
+    if replace and (replace_with is not None):
         data = data.replace(replace, replace_with)
 
     with open(dfn, "w") as df:
@@ -469,6 +472,7 @@ def setup(name, version):
         version=version,
         ext_modules=extensions,
         py_modules=py_modules,
+        zip_safe=False,
         )
 
 

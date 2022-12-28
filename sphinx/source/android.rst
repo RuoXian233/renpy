@@ -12,6 +12,9 @@ packaged and ported to these devices.
 RAPT – the Ren'Py Android Packaging Tool – is a program, downloaded separately
 from Ren'Py, that creates an Android package for testing or release purposes.
 
+Ren'Py runs on Android 5.0 and later, though older devices may lack the
+resources to run larger games properly.
+
 Required Language
 =================
 
@@ -292,6 +295,7 @@ When generating the application, Ren'Py will convert these files to an
 appropriate size for each device, and will generate static icons for devices
 that do not support adaptive icons.
 
+.. _android-presplash:
 
 Presplash
 ---------
@@ -307,7 +311,7 @@ android-presplash.jpg
     screen is filled with the border color.
 
 android-downloading.jpg
-    The image thjat's used when the app is downloading assets from Google
+    The image that's used when the app is downloading assets from Google
     Play Asset delivery. This should be surrounded
     by 1px of a monocolored border. When displayed, the image is scaled to
     fit available space while preserving aspect ratio, and the rest of the
@@ -321,7 +325,7 @@ android-downloading.jpg
 Pyjnius
 =======
 
-When running on Android, a version of the `Pyjnius <https://pyjnius.readthedocs.io/en/stable/>`_
+When running on Android, a version of the `Pyjnius <https://pyjnius.readthedocs.io/en/stable/>`__
 library is available. This allows advanced creators to call into the Android
 libraries.
 
@@ -330,8 +334,8 @@ field in the org.renpy.android.PythonSDLActivity class. For example::
 
     init python:
         if renpy.android:
-            import jinus
-            mActivity = jnius.autoclass("org.renpy.android.PythonSDLActivity")
+            import jnius
+            mActivity = jnius.autoclass("org.renpy.android.PythonSDLActivity").mActivity
         else:
             mActivity = None
 
@@ -372,4 +376,3 @@ Android/data/org.renpy.mygame/files/game
     This might not exist, in which case you may create it. Files in this directory
     are loaded in preference to files in the androids packages, which means that
     patches can be placed in this directory.
-

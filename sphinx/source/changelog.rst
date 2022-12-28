@@ -2,14 +2,659 @@
 Changelog (Ren'Py 7.x-)
 =======================
 
+*There is also a list of* :doc:`incompatible changes <incompatible>`
+
+.. _renpy-8.1.0:
+.. _renpy-7.6.0:
+
+8.1 / 7.6
+=========
+
+Mixer Volume Changes
+--------------------
+
+Ren'Py has changed how mixer volumes are represented. Internally, the mixer
+volumes are stored as number between 0.0 and 1.0. This number is multiplied
+with the samples to produce the voltage supplied to the speakers or headphones,
+and hence the square of this determines the power.
+
+Mixers now work in decibels (power), similar to the way the volume controls
+on audio equipment and computers work. An empty mixer slider represents -60 dB
+below the maximum volume, while a full bar represents 0 dB, the full volume.
+
+Variables that control the default mixer volumes, such as :var:`config.default_music_volume`,
+:var:`config.default_sfx_volume`, and :var:`config.default_voice_volume` now work on a scale
+where 0.0 is -60 dB, and 1.0 is 0 dB. :func:`SetCharacterVolume` works in a similar way,
+as do the new :func:`preferences.set_mixer` and :func:`preferences.get_mixer` functions.
+
+The advantage of this change is that it makes the volumes sliders much more dynamic.
+Previously, the volume slider had to be very near the bottom before it had an effect.
+Now, the volume increases and decreases match the way people perceive loudness.
+
+
+Draggable Viewports
+-------------------
+
+Viewports can now be dragged by the user, even if a button or other displayable
+inside the viewport is focused. Ren'Py will now detect when the user is dragging,
+and switch focus to the viewport, allowing the viewport to move.
+
+The `draggable` property of :ref:`viewports <sl-viewport>` and :ref:`vpgrids <sl-vpgrid>`
+can now take a :ref:`screen variant <screen-variants>` like "touch", in which
+case the viewport will only be draggable if touch is enabled.
+
+
+\_ren.py Files - Ren'Py in Python
+---------------------------------
+
+:doc:`The new \_ren.py file format <ren_py>` allows Ren'Py script to be embedded
+in a valid Python file. For example::
+
+    """renpy
+    init python:
+    """"
+
+    flag = True
+
+is equivalent to::
+
+    init python:
+
+        flag = True
+
+The purpose of this new format is to allow Python-heavy script files to be edited
+with Python-specific tools, while still running as Ren'Py script.
+
+
+Constant Stores
+---------------
+
+Ren'Py has the ability to mark a :ref:`named store <named-stores>` as a constant,
+by setting the ``_constant`` variable in that store. If true, variables in that
+:ref:`constant store <constant-stores>` will not be saved, and objects reachable
+solely from that store will not participate in rollback.
+
+The reason to declare a store constant is that there are small per-store and
+per-variable overheads that are required to support rollback. Declaring a
+store constant can eliminate these overheads.
+
+The following stores are declared to be constant by default:
+
+    _errorhandling
+    _gamepad
+    _renpysteam
+    _warper
+    audio
+    achievement
+    build
+    director
+    iap
+    layeredimage
+    updater
+
+Variables in a constant store can be updated during the init phase, but should
+not change after the init phase finishes.
+
+
+Lenticular Bracket Ruby Text
+-----------------------------
+
+:ref:`Ruby text <ruby-text>`, small text above the main characters used
+for readings and translations, can now be written be written by enclosing it in
+full-width lenticular brackets (【】), with the full-width or half-width
+vertical line character (｜ or |) separating the bottom text from the top text.
+For example::
+
+    e "Ruby can be used for furigana (【東｜とう】 【京｜きょう】)."
+
+    e "It's also used for translations (【東京｜Tokyo】)."
+
+In some contexts, the left full-width lenticular bracket (【) must be
+doubled, to "【【", to prevent it from being interpreted as the start of
+ruby text. For example::
+
+    e "【【This is not | ruby text.】"
+
+
+New Features
+------------
+
+The :func:`Text` displayable now takes a new `tokenized` argument. When
+true, the Text displayable expects to take a list of tokens taken from
+a :ref:`custom text tag <custom-text-tags>`.
+
+Two new layers are now part of Ren'Py. The "top" layer is displayed above
+all other layers, and does not participate in transitions. This makes
+it useful for display information that is always shown. The "bottom" layer
+is displayed below all other layers. The bottom layer is useful for
+handling keys in a way that is always active.
+
+Ren'Py supports the C90 encoding for Thai fonts, which uses the unicode
+private area to provide glyphs that are combinations of base characters,
+vowel marks, and tone marks. This can be enabled by selecting a Thai font
+that supports the C90 encoding, and then setting :propref:`language` to
+"thaic90".
+
+It's now possible for a mouse keysym to be given modifiers corresponding
+to the state of keyboard modifiers when the mouse button was pressed. For
+example, "shift_mouseup_1" will only trigger when mouse button 1 is
+released while the shift key is held down.
+
+Normally, when a displayable or screen with the same tag or name as one
+that is hiding is shown, the hiding displayable or screen is removed,
+cancelling the hide transform. The new :tpref:`show_cancels_hide` transform
+property controls this behavior.
+
+The console (accessed with shift+O) ``help`` command can now take an
+expression, in which case it display the pydoc documentation for the
+function or class that expression refers to.
+
+The new :func:`renpy.get_translation_identifier` function returns the
+unique identifier for the current line of dialogue, if there is one.
+
+The new :var:`config.scene_callbacks` function contains a list of functions
+that are called when the scene statement is run or the :func:`renpy.scene`
+function is called.
+
+The size text tag now takes multipliers, so it's possible to have::
+
+    "{size=*2}This is double size{/size} and {size=*0.5}this is half size{/size}."
+
+The :ref:`dismiss <sl-dismiss>` displayable now takes a `keysym` property,
+specifying what keysym causes the dismiss.
+
+The new :var:`config.autosave_callback` is run after a background autosave
+finishes.
+
+The new :func:`renpy.music.pump` function can be called to cause audio changes
+to take effect immediately, rather than at the start of the next interaction.
+The main use of this is to allow a sound to be played, and then faded out. (By
+default, a ``play`` followed by a ``stop`` causes the track to never be
+played, and hence never faded out.)
+
+The new :func:`renpy.clear_attributes` function allows for an image tag to be
+cleared of all the attributes attached to it. The previous way to do this was
+to hide and show the image again, which had the consequence of also resetting
+the placement of the image on the screen. It is not the case with this function.
+
+Other Changes
+-------------
+
+Ren'Py no longer requires grids or vpgrids to be full - it will now pad these
+grids with nulls as required.
+
+The `execute_init` argument to :func:`renpy.register_statement` now respects
+the `init_priority` argument. Previously, all `execute_init` function ran
+at init priority 0.
+
+The config.label_callback variable has been renamed to :var`config.label_callbacks`,
+and now takes a list of callback functions.
+
+
+.. _renpy-7.5.3:
+.. _renpy-8.0.3:
+
+8.0.3 / 7.5.3
+=============
+
+Security
+--------
+
+There is now a new :doc:`security` page in the documentation, intended to help
+players understand the security implications of mods and sharing save files.
+
+Modal Screen, Pauses, and Timers
+--------------------------------
+
+Based on feedback from creators, the changes to how modal screens interact
+with pauses and timers have been redone. As of this version, pauses will
+not end when a modal screen is shown, while timers will trigger while
+a modal screen is shown above the timer.
+
+There are some cases where this behavior may not be wanted. To deal with
+those cases, the :ref:`timer displayable <sl-timer>` and :func:`renpy.pause`
+have a new `modal` property/parameter. If `modal` is True, pauses will
+end and timers will respect the modal screen, and will not trigger until
+the screen disappears. If false, the modal screen will not be respected,
+causing pauses to end and timers to trigger while the modal screen is
+still displayed.
+
+Changes and Fixes
+-----------------
+
+Ren'Py has been updated to target Android API level 33, corresponding to Android 13,
+allowing new games to be added to the Google Play store. The Play Billing library
+has been updated to version 5.
+
+Init statements inside a module loaded with :func:`renpy.load_module` are now
+run in init-priority order.
+
+Lint now respects :var:`config.adjust_attributes`.
+
+A case where blurs could become transparent has been addressed.
+
+When the translation language changes during a menu that is using dialogue as a
+caption, Ren'Py will jump the game back to the start of the say statement that
+added that dialogue, allowing it to be re-translated.
+
+When a game is being developed, Ren'Py will now produce an error if the first
+use of :func:`gui.preference` has not been given a default. This makes an error
+that could happen at runtime in that case more explicit.
+
+There have been many documentation improvements.
+
+This release fixes a problem with Matrix equality that could prevent
+transform properties that use Matrixes from being animated correctly.
+
+Ren'Py now properly analyzes variables that are bound by lambdas.
+
+The Tutorial and The Question have been translated into Ukrainian, and the
+Ukrainian translation of the launcher has been updated.
+
+
+.. _renpy-7.5.2:
+.. _renpy-8.0.2:
+
+8.0.2 / 7.5.2
+=============
+
+Fixes
+-----
+
+There have been a number of changes to the way autoreload (shift+R) works, to
+try to prevent Ren'Py from creating an invalid save file when an autoreload after
+an error happens, and Ren'Py is in an invalid state. The goal of these changes
+is to preserve the save file from before the change, and reuse that.
+
+Ren'Py is now able to perform audio fadeins and fadeouts of less than 0.68
+seconds. Previously such short fadeins and fadeouts would be result in an
+underflow and no fading. In this release, the precise duration of a fadein
+and fadeout is not strictly guaranteed.
+
+Several functions in achievement.steam (or _renpysteam) had regressions when
+reimplmented in terms of achievement.steamapi. These regressions have been
+fixed.
+
+An issue that prevented built distributions from launching on aarch64 has
+been fixed.
+
+An issue that could cause excessive CPU and memory usage when a store had
+large number of variables in it has been fixed.
+
+Loading a save slot that was saved with a different language than is currently set will no
+longer prevent :var:`config.after_load_transition` from occurring.
+
+Several problems that preventing In-App Purchases (IAP) from working on Ren'Py
+8 have been fixed.
+
+An issue with examples in the tutorial game not working in a non-English languages
+has been fixed.
+
+Tinydialogs is now included in the source code distribution of Ren'Py.
+
+
+Default Focus Changes
+---------------------
+
+There have been several changes to the `default_focus` property of focusable
+displayables like buttons and bars. This property allows Ren'Py to select a
+displayable to gain default focus when displayables are added to removed.
+
+The new rules are:
+
+* When the mouse is used, focus follows the mouse and `default_focus` is ignored.
+* When a displayable with a higher `default_focus` than any other displayable
+  is shown, it is given focus.
+* When the displayable with the highest `default_focus` is hidden, the displayable
+  with the next highest non-zero `default_focus` is given focus.
+
+The goal is to support common keyboard and controller navigation patterns,
+while not getting in the way of mouse users.
+
+
+Other Improvements
+------------------
+
+There have been many copyedits and other improvements to Ren'Py's documentation.
+
+The console has been improved to display more Python 3 types.
+
+:func:`MouseDisplayable` now respects :var:`default_mouse`, if set.
+
+In Ren'Py 8, Python blocks are now compiled as if the ``from __future__ import annotations``
+statement was present.
+
+A modal screen or dismiss statement now blocks the ``pause`` statement and :func:`renpy.pause``
+from ending. Previously, what happened in this case was undefined and varied between
+versions.
+
+On macOS, Ren'Py will now properly adjust when the game window is moved between
+displays with different scaling.
+
+Command-C and Command-V now work for copy and paste on macOS.
+
+The default input screen in screens.rpy has now been changed to prevent a
+conflict between the :propref:`xalign` and :propref:`xpos` of the vbox.
+The fix was to change the use of xalign to :propref:`xanchor`.
+
+Ren'Py will now start if a sound card is not present, even in developer mode.
+Errors with audio hardware are now written to log.txt.
+
+The Japanese translation has been updated.
+
+New games created with Ren'Py no longer filter out ruby/furigana text tags.
+
+
+
+.. _renpy-7.5.1:
+.. _renpy-8.0.1:
+
+8.0.1 / 7.5.1
+=============
+
+Improvements
+------------
+
+The launcher now has a Ukrainian translation, courtesy of Matias B.
+
+The web port will now reuse audio data when an audio file loops, reducing
+the memory usage.
+
+ATL transforms used inside a :func:`MouseDisplayable` are now reset each
+time the mouse is changed. Previously, this behavior was undefined.
+
+The trace screen used by the console is now updated once per frame.
+
+There have been a large number of documentation improvements.
+
+Fixes
+-----
+
+Alt text is now played in first-to-last order. A change to 8.0 caused
+the order alt text was played in to be reversed.
+
+A rounding error that would cause the CropMove transitions to work
+incorrectly was fixed.
+
+An issue preventing the zoomin and zoomout transitions from working
+was fixed.
+
+The Movie displayable can once again take a list of movie files to
+play, rather than only a single filename.
+
+An issue with building on Android has been fixed.
+
+Object identity is used to compared the arguments of :func:`Function`
+actions. This prevents an issue where an action could be incorrectly
+reused if the action's arguments where equal, but not the same (for
+example, two empty lists).
+
+Problems with getting and setting Steam statistics have been fixed.
+
+The :ref:`dismiss <sl-dismiss>` is now correctly modal.
+
+
+
 .. _renpy-7.5.0:
 .. _renpy-8.0.0:
 
-7.5 / 8.0
+8.0 / 7.5
 =========
 
-ATL
----
+Python 3 Support (Ren'Py 8.0)
+-----------------------------
+
+Ren'Py 8.0 runs under Python 3, the latest major version of the Python
+language.
+
+If your game uses minimal Python (for example, just storing character
+names and flags), it should work the same as it did before. Otherwise,
+please read on.
+
+The move to Python 3 makes over a decade of Python language and
+library improvements available to the Ren'Py developer, as described
+in the `What's new in Python <https://docs.python.org/3.9/whatsnew/index.html>`_
+documentation. There are far too many changes in Python 3 to include here,
+so please check that and other Python websites for descriptions.
+
+That being said, a few things made available to the Python in your Ren'Py
+games are:
+
+* Functions can have keyword-only parameters. (These are also supported
+  in parameter lists for labels, transforms, and screens.)
+
+* The ability to annotate functions arguments and return values with type
+  information. (This is only supported in Python.)
+
+* Formatted string literals can now be used. These
+  are strings like ``f"characters/{character}.chr"``, where the text in
+  braces is replaced by a formatted Python variable, similarly to the
+  way that interpolation works in Ren'Py dialogue. This is only available
+  in Python, however, and not in most purely Ren'Py statements.
+
+There are a huge number of other improvements in the ten major releases of
+Python between 2.7 and 3.9, so be sure to read the above and other Python
+documentation to find out everything that's improved.
+
+One of the greatest advantages is that this moves Ren'Py off Python 2.7,
+which is no longer supported by the Python Software Foundation, and so
+the move to Ren'Py 8.0 helps secure Ren'Py's future.
+
+There are a few things that may need to be converted if you used advanced
+Python.
+
+* In Python 3, division always returns a float, rather than an integer.
+  (for example, ``3 / 2`` is now 1.5 rather than 1). The ``//`` operator
+  divides as an integer. This change can affect Ren'Py positioning,
+  where floats are treated differently from integers.
+
+* In Python 3, the keys, items, and values methods of dictionaries now
+  return views, not lists. The iterkeys, iteritems, and itervalues
+  methods are not supported. The xrange method is gone, and range
+  no longer returns a list.
+
+* Except clauses now must be written like ``except Exception as e:``,
+  as the old syntax, ``except Exception, e:`` is not supported.
+
+* All strings are now unicode by default (Ren'Py has been forcing this
+  for several years), and files are opened in text mode by default.
+  (However, :func:`renpy.file` opens files in binary mode. It's been
+  renamed to :func:`renpy.open_file` and can take a default encoding.)
+
+* Many Python modules have been renamed.
+
+This is not an exhaustive list.
+
+Ren'Py ships with a cut-down version of the Python Standard library, so
+not every Python module is available in Ren'Py. Please let us know if there
+is something missing you have a good use for, especially if that module
+does not require a library dependency. While ``async`` and ``await``
+are available, Ren'Py doesn't directly support coroutines.
+
+Ren'Py 8.0 ships with Python 3.9.10, and is available on the Windows,
+macOS, Linux, Android, and iOS platforms. The web platform will
+be supported in a future release.
+
+When running under Ren'Py 8, Ren'Py now runs without the equivalent of the
+Python ``-O`` flag. This means that docstrings and assert statements are
+available.
+
+Our experience is that many games run unchanged under Python 3, especially
+games that use Python primarily through the Ren'Py API, to manage
+game state. Ren'Py 8 has been used to run unmodified Ren'Py games
+going back to the year 2006.
+
+
+Continued Python 2.7 Support (Ren'Py 7.5)
+-----------------------------------------
+
+Ren'Py 7.5 is being released at the same time as Ren'Py 8.0, to continue
+to provide a version of Ren'Py that runs on Python 2.7, as a way of
+supporting games in development (or being maintained after release)
+that still require Python 2.7.
+
+In this release, Ren'Py 7.5 also supports the web platform, which
+Ren'Py 8.0 does not yet support.
+
+For this release, Ren'Py 7.5 and Ren'Py 8.0 should support the same
+set of of features.
+
+We plan to continue to support Ren'Py 7.x until we see that the community
+has moved to Ren'Py 8.x, or until changes to the Python ecosystem mean
+that supporting Ren'Py on Python 2 is no longer tenable.
+
+Please test your games on Ren'Py 8 - for many games, few to no changes
+will be needed. If for some reason you can't port your game to Ren'Py
+8, please let us know what is holding you back.
+
+
+Platform Support Changes
+------------------------
+
+This release adds support for the 64-bit ARM Linux (linux-aarch64)
+platform. While based on Ubuntu 20.04, this has been tested on Chromebooks,
+and should also work on the 64-bit ARM platform.
+
+The intended way to run Ren'Py games on ARM Linux would be to download
+the new ARM Linux SDK package, place the game in the projects directory,
+and use that to launch the game. If the files from the ARM Linux SDK are
+present when a Linux distribution is made, they will be included, creating
+a game that can be launched on ARM, but this is not the default, for
+size reasons.
+
+With the move to Ren'Py 8, we are removing support for the
+following platforms:
+
+* 32-bit x86 Windows (i686)
+* 32-bit x86 Linux (i686)
+
+This reflects the obsolescence of 32-bit x86 computing. These platforms remain
+supported by Ren'Py 7.5, but will not be supported by Ren'Py 8.
+
+Web and ChromeOS
+----------------
+
+The web platform is currently only supported on Ren'Py 7.5.
+
+Changes to the Safari and Chrome web browsers increased the memory Ren'Py
+used by about 50 times, causing RangeErrors when the web browser ran out
+of stack memory. Ren'Py 7.5 includes changes to reduces the amount of
+memory used inside web browsers. As a result, Ren'Py now runs again
+inside Chrome and Safari, including on iOS devices.
+
+The new :var:`config.webaudio_required_types` variable can be given a list of
+mime types of audio files used by the game. Ren'Py will only use the web
+browser's Web Audio system for playback if all of the mime types are supported
+in the browser. If not, webasm is used for playback, which is more likely to
+cause skipping if the computer is slow.
+
+The config.webaudio_required_types variable is intended to allow games using ogg
+or opus audio to run on Safari, and can be changed if a game only uses mp3 audio.
+
+When importing save files into a web distribution, Ren'Py will now refresh
+the list of save files without a restart.
+
+When running as an Android application on a ChromeOS device, the "chromeos"
+variant will be selected.
+
+The Ren'Py SDK can be run on ARM Chromebooks.
+
+Android and iOS
+---------------
+
+The Android configuration once again prompts as to which store to use
+for in app purchases. When no store is selected, libraries to support
+purchasing are not included in the project. These libraries would include
+the billing permission, which would flag the game as supporting in-app
+purchases even if no purchases were used.
+
+Due to issues in underlying libraries, the :func:`renpy.input` function
+and ``input`` displayable are now documented as not supporting IME-based
+(non-alphabetic) input on Android.
+
+On iOS, OpenGL ES calls are translated to the native Metal graphics system.
+Doing this should improve compatibility with recent Apple devices, and
+fixes problems running applications under the iOS simulator on Apple
+Silicon-based devices.
+
+
+Steam, Steam Deck, and Epic Games Store
+---------------------------------------
+
+This release includes rewritten Steam support, provided by a new
+ctypes-based binding that gives access to the entire Steamworks API,
+including callbacks. While the Steam support available through the
+:doc:`achievement module <achievement>` remains unchanged, this
+gives advanced Python programmers access to more Steam functionality.
+
+When Steam is active, Ren'Py will now enable the "steam" variant.
+
+This release includes built-in support for the Steam Deck hardware.
+The support includes the ability to automatically display the
+on-screen keyboard when :func:`renpy.input` is called.
+The steam deck also causes Ren'Py to enable the "steam_deck",
+"steam", "medium", and "touch" variants.
+
+We have a `Ren'Py on Steam Deck Guide <https://github.com/renpy/steam-deck-guide>`_
+to help you get your game certified on that platform. Thanks go to Valve for
+supplying a Steam Deck to test on.
+
+The "Windows, Mac, and Linux for Markets" distribution has been changed to
+no longer prefix the contents of the zip file created with the directory
+name and version number, meaning it's no longer required to update launch
+configurations with each release to Steam. This may require a one-time
+update to the launch configuration.
+
+Ren'Py now includes support for being launched by the Epic Games Store,
+by ignoring various command line arguments supplied by EGS.
+
+
+Visual Studio Code
+------------------
+
+Ren'Py now includes support for downloading and using Visual Studio Code,
+including downloading the `Ren'Py Language <https://marketplace.visualstudio.com/items?itemName=LuqueDaniel.languague-renpy>`_
+extension.
+
+The Ren'Py Language extension provides rich support for Ren'Py, including
+syntax highlighting, snippets, completion, color previews, documentation,
+go to definition, function signatures, error diagnostics, outlining,
+and more.
+
+Visual Studio Code also has a large system of extensions, including
+spell-checkers, that can be used with with the Ren'Py Language extension.
+
+Visual Studio Code can be activated by going to the editor preferences
+and choosing to download it. It's also possible to configure Ren'Py
+to use a system install of Ren'Py with extensions that you choose.
+
+
+Dismiss, Nearrect, and Focus Rectangles
+---------------------------------------
+
+Two new displayables have been added to Ren'Py to help use cases like
+drop-down menus, pulldown menus, and tooltips.
+
+The :ref:`dismiss <sl-dismiss>` displayable is generally used behind a
+modal frame, and causes an action to run when it is activated. This allows,
+among other things, a behavior where if the player clicks outside the frame,
+the frame gets hidden.
+
+The :ref:`nearrect <sl-nearrect>` displayable lays out a displayable either
+above or below a rectangle on the screen. This can be used to display a
+tooltip above a button, or a drop-down menu below it. (An example of
+a drop-down menu is documented with nearrect, and an example of tooltip
+usage is with :ref:`tooltips <tooltips>`.
+
+The rectangles aside of which the nearrect places things can be captured by
+the new :func:`CaptureFocus` action, which captures the location of the current
+button on the screen. After being captured, the :func:`GetFocusRect` function
+can get the focus rectangle, and the :func:`ClearFocus` can clear the
+captured focus,  and the :func:`ToggleFocus` action
+captures and clears focus based on the current focus state.
+
+ATL and Transforms
+------------------
 
 It's now possible to include a block as part of an ATL interpolation.
 This means that::
@@ -33,6 +678,13 @@ many of which led to visual glitches.
 When an ATL image is used as one of the children of an image button, its
 shown time begins each time it is shown.
 
+The default for the :tpref:`crop_relative` transform property has been changed to
+True.
+
+The ``function`` statement will now block execution only if producing a delay,
+which allows transforms using it to behave more naturally when catching up with
+an inherited timebase.
+
 Image Gallery
 -------------
 
@@ -40,35 +692,19 @@ The :class:`Gallery` class now has a new field, `image_screen`, that can be
 used to customize how gallery image are displayed.
 
 The :func:`Gallery.image` and :func:`Gallery.unlock_image` methods now
-take keywork arguments beginning with `show\_`. These arguments have the
+take keyword arguments beginning with `show\_`. These arguments have the
 `show\_` prefix stripped, and are then passed to the Gallery.image_screen
 as additional keyword arguments. This can be used to include additional
 information with the images in the gallery.
 
-ChromeOS
---------
-
-When running as an Android application on a ChromeOS device, the "chromeos"
-variant will be selected.
-
-Web
----
-
-The new :var:`config.webaudio_required_types` variable can be given a list of
-mime types of audio files used by the game. Ren'Py will only use the web
-browser's Web Audio system for playback if all of the mime types are supported
-in the browser. If not, webasm is used for playback, which is more likely to
-cause skipping if the computer is slow.
-
-The config.webaudio_required_types variable is intended to allow games using ogg
-or opus audio to run on Safari, and can be changed if a game only uses mp3 audio.
 
 Boxes, Grids and Vpgrids
 ------------------------
 
-A :ref:`showif <sl-showif>` statement inside a :ref:`vbox <sl-vbox>` or :ref:`hbox <sl-hbox>`
-will not be surrounded with :propref:`spacing` when the condition is false and the child
-displayable is not shown.
+Displayables that take up no space (like :ref:`key <sl-key>`, :ref:`timer <sl-timer>`
+or a false :ref:`showif <sl-showif>`) inside a :ref:`vbox <sl-vbox>` or :ref:`hbox <sl-hbox>`
+will not be surrounded with :propref:`spacing`. These displayables still take
+up space in other layouts, such as grids.
 
 Having an overfull vpgrid - when both ``rows`` and ``cols`` are specified - is now
 disallowed.
@@ -98,8 +734,23 @@ on a per-screen basis by enabling the new `roll_forward` property on the
 screen. If all screens in your game support roll forward, it can be enabled
 with the new :var:`config.call_screen_roll_forward` variable.
 
-Features
---------
+New Features
+------------
+
+The ``show screen``, ``hide screen`` and ``call screen`` statements now
+take an ``expression`` modifier, which allows a Python expression to supply
+the name of the screen.
+
+There is a new "main" volume that can be accessed through :func:`Preferences`.
+The main volume is multiplied with all the other volumes to globally reduce
+the volume of the game.
+
+The new  :var:`config.preserve_volume_when_muted` variable causes
+Ren'Py to show the current volume when channels are muted.
+
+A button to clean the Ren'Py temporary directory has been added
+to the preferences screen of the launcher. This can remove these
+files to reduce the space Ren'Py requires.
 
 The new :var:`config.choice_empty_window` variable can customize
 the empty window that is shown when a choice menu is displayed. The intended
@@ -151,12 +802,47 @@ The new RENPY_PATH_TO_SAVES environment variable makes it possible to control
 where Ren'Py places system-level saves. The RENPY_MULTIPERSISTENT variable has
 been documented, and controls the same thing with multipersistent data.
 
+The new :var:`config.at_exit_callbacks` functions are called when the game
+quits. This is intended to allow the game to save additional data created
+by the developer.
+
+The :var:`config.default_attribute_callbacks` variable allows a game to
+specify default attributes for a tag that are used when other attributes
+do not conflict.
+
+
+Other Changes
+-------------
+
+It is now possible to copy from :func:`renpy.input` with ctrl-C, and paste
+with ctrl-V. When text input is displayed, ctrl will no longer cause skipping
+to happen.
+
+The :func:`renpy.file` function has been renamed to :func:`renpy.open_file`,
+with the old named retained. It has also gained an `encoding` parameter to
+open the file with an encoding.
+
 The :propref:`focus_mask` style property now defaults to None for drag displayables.
 This improves performance, but means that the displayable can be dragged by
 transparent pixels.
 
-Other changes
--------------
+When adding files to the audio namespace, Ren'Py now scans for flac
+files.
+
+Say statements used as menu captions can now take permanent and temporary
+image attributes, just like say statements elsewhere.
+
+All position properties can now be supplied as gui variables to buttons.
+For example::
+
+    define gui.navigation_button_text_hover_yoffset = -3
+
+now works.
+
+The behavior of modal :ref:`frames <sl-frame>` has been changed. A modal
+frame now blocks mouse events when inside the frame, and blocks focus from
+being transferred to displayables fully behind the frame, while allowing focus
+to be given to other displayables.
 
 The new :var:`config.main_menu_stop_channels` variable controls the
 channels that are stopped when entering the main menu.
@@ -190,6 +876,30 @@ Playing or stopping music on a channel now unpauses that channel.
 
 The new :var:`preferences.audio_when_minimized` preference now enables the
 audio of the game to be paused when the window is minimized.
+
+The default for :propref:`outline_scaling` is now "linear".
+
+The version of SDL used by Ren'Py has been upgraded to 2.0.20 on non-web
+platforms.
+
+Many translations have been updated.
+
+The jEdit editor has been removed, as the Ren'Py integration was largely
+obsolete. However, if the version from 7.4.0 is unpacked, it should be
+selectable in the launcher.
+
+Versioning
+----------
+
+Ren'Py's full version numbers are now of the form major.minor.patch.YYMMDDCCnu,
+where:
+
+* YY is the two digit year of the latest commit.
+* MM is the month of the commit.
+* DD is the day of the commit
+* CC is the commit number on that day
+* n is present if this is a nightly build.
+* u is present if this is an unofficial build.
 
 
 .. _renpy-7.4.11:
@@ -413,7 +1123,7 @@ Ren'Py will now look for archives in the external files directory, and
 automatically use the archives if found. This makes it possible to
 distribute patches, updates, and additional asset to users.
 
-The inclusion of :ref:`Pyjnius <pyjinus>`, a library for calling
+The inclusion of :ref:`Pyjnius <pyjnius>`, a library for calling
 the Android API, is now documented.
 
 The new :var:`build.android_permissions` variable, :func:`renpy.check_permission`
@@ -773,7 +1483,7 @@ to False.
 When the model-based renderer is being used, Ren'Py now supports a "3D Stage".
 This adds a third dimension to shown images, allowing for perspective correct
 zooming and motion, the rotation and translation of displayables in 3D,
-and many other new effects. Please see the :ref:`3D Stage <3dstage>`
+and many other new effects. Please see the :doc:`3D Stage <3dstage>`
 documentation for more information.
 
 To facilitate the 3D Stage, the ``scene`` statement no longer clears
@@ -942,7 +1652,7 @@ Live2D now supports the additive and multiply blend modes.
 Using default or define with the ``renpy`` namespace will now produce an
 error.
 
-A number of previously-undocumented methods on the `preferences object <preference-variables>`
+A number of previously-undocumented methods on the :doc:`preferences object <preferences>`
 have been documented. These methods make it possible to get or set the current value
 of the volume and the current value of mute.
 
@@ -1904,7 +2614,7 @@ Text Improvements
 -----------------
 
 Ren'Py now includes support for self-closing custom text tags, which
-are :ref:`custom text tags <custom-text-tags>` that do not require as
+are :doc:`custom text tags <custom_text_tags>` that do not require as
 closing text tag.
 
 Ren'Py now supports three new flags that can be applied when formatting
@@ -1950,7 +2660,7 @@ The ``side`` displayable now renders its children in the order
 they are provided in the control string.
 
 The ``say`` statement, ``menu`` statement, and ``renpy.call_screen``
-statements now tak a `_mode` argument, which specifies the :ref:`mode <modes>`
+statements now take a `_mode` argument, which specifies the :doc:`mode <modes>`
 Ren'Py goes into when these statements occur.
 
 The :func:`renpy.show_screen` and :func:`renpy.call_screen` functions now
@@ -2177,7 +2887,7 @@ than the screen, and will be selected if the current window size is the
 maximum window size, if the size selected with :func:`gui.init` is bigger
 than the maximum window size.
 
-:ref:`Creator defined statements <cds>` now have a few more lexer methods available,
+:doc:`Creator defined statements <cds>` now have a few more lexer methods available,
 making it possible to to parse arguments, image name components, labels, and
 delimited python.
 
@@ -2625,7 +3335,7 @@ contains the differences between 7.0 and 6.99.14.3.
 Layered Images
 --------------
 
-A :ref:`layered image <layered-images>` is a new way of defining images
+A :doc:`layered image <layeredimage>` is a new way of defining images
 for use in Ren'Py. It's intended to be used with a sprite that has been
 created in Photoshop or some other program as a series of layers.
 The layered image system can use the attributes the image was displayed
